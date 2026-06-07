@@ -8,7 +8,7 @@ const loginTime    = new Trend('login_time');
 const errorRate    = new Rate('error_rate');
 const bookingCount = new Counter('booking_success');
 
-const BASE_URL = __ENV.BASE_URL || 'https://your-platform.com';
+const BASE_URL = __ENV.BASE_URL || 'https://www.dheuof.com';
 
 export const options = {
   stages: [

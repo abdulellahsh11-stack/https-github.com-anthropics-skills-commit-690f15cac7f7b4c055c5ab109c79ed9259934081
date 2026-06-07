@@ -5,7 +5,7 @@
 
 set -e
 
-BASE_URL="${BASE_URL:-https://your-platform.com}"
+BASE_URL="${BASE_URL:-https://www.dheuof.com}"
 SUMMARY="summary.json"
 REPORT="تقرير_الأداء.pdf"
 
