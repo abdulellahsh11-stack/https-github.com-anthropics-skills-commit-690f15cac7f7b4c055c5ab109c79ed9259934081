@@ -1,4 +1,4 @@
-# برومبت منصة ضيوف — النسخة الكاملة المحدثة
+# برومبت منصة ضيوف — النسخة الكاملة النهائية
 
 ---
 
@@ -46,7 +46,7 @@
 - يدير منشأته الخاصة فقط (فندق / شقق فندقية / منتجع...).
 - **ينشئ حسابات الموظفين** داخل منشأته.
 - **يحدد صلاحيات كل موظف** لكل وحدة بشكل منفصل (Toggle per module).
-- يضبط: إعدادات الضرائب + تطبيق الحجز المباشر + Night Audit + أوقات الدخول/الخروج.
+- يضبط: **إعدادات الضرائب (من يتحمل الضريبة)** + تطبيق الحجز المباشر + Night Audit + أوقات الدخول/الخروج.
 - لا يرى بيانات المنشآت الأخرى أبداً.
 - يُنشأ حسابه من Admin.
 
@@ -68,50 +68,78 @@
 
 ---
 
-## ثالثاً: نظام الضرائب (مُحدَّث)
+## ثالثاً: نظام الضرائب
+
+### مبدأ أساسي
+
+**الضريبة إجبارية حسابياً دائماً** — تُحسب وتُرفع لـ ZATCA في جميع الأحوال.
+**لكن المدير يختار: هل يتحملها الضيف أم المنشأة؟**
+
+- `على الضيف (افتراضي)`: الضريبة تُضاف فوق السعر الصافي → الإجمالي أعلى.
+- `تتحملها المنشأة`: الضريبة تُستخرج من داخل السعر → الإجمالي للضيف لا يتغير، والمنشأة تتحمل الفرق.
 
 ### أنواع الضرائب
 
-| الضريبة | المعدل | النوع | من يتحكم فيها |
+| الضريبة | المعدل | الإجبارية | من يتحكم في التحميل |
 |---|---|---|---|
-| ضريبة القيمة المضافة (VAT) | 15% | إجبارية — ثابتة بالنظام السعودي | النظام تلقائياً |
-| رسوم السياحة | 2.5% (افتراضي) | **اختيارية** — يفعّلها/يعطّلها المدير | Manager من إعدادات المنشأة |
+| ضريبة القيمة المضافة (VAT) | 15% | **إجبارية دائماً** — تُحسب وتُرفع لـ ZATCA | Manager: على الضيف أم المنشأة؟ |
+| رسوم السياحة | 2.5% (افتراضي) | **اختيارية** — يفعّلها المدير | Manager: تفعيل/تعطيل + على الضيف أم المنشأة؟ |
 
 ### منطق حساب الأسعار
 
 ```
-base_price          = سعر الغرفة × عدد الليالي
-discount_amount     = base_price × discount_rate  (إن وُجد خصم)
-price_net           = base_price - discount_amount
+─── المشترك في الحالتين ───────────────────────────────────────
+base_price         = سعر الغرفة × عدد الليالي
+discount_amount    = base_price × discount_rate
+price_net          = base_price - discount_amount
+tourism_tax_amount = tourism_tax_enabled ? (price_net × tourism_tax_rate) : 0
 
-tourism_tax_amount  = tourism_tax_enabled ? (price_net × tourism_tax_rate) : 0
-vat_base            = price_net + tourism_tax_amount
-vat_amount          = vat_base × 0.15
-total_amount        = vat_base + vat_amount
+─── الحالة A: المنشأة تمرّر الضريبة للضيف (افتراضي) ──────────
+vat_base           = price_net + tourism_tax_amount
+vat_amount         = vat_base × 0.15
+total_amount       = vat_base + vat_amount             ← الضيف يدفع هذا
+
+─── الحالة B: المنشأة تتحمل الضريبة ───────────────────────────
+total_amount       = price_net + tourism_tax_amount    ← الضيف يدفع هذا فقط
+vat_base           = total_amount / 1.15               ← تُستخرج داخلياً لـ ZATCA
+vat_amount         = total_amount - vat_base           ← المنشأة تتحمله
 ```
 
-### تفصيل الفاتورة (يظهر في كل حجز وفاتورة ZATCA)
+> **قاعدة التحقق:** في كلتا الحالتين `vat_amount` يُرسل لـ ZATCA — لا فرق في الالتزام الضريبي، الفرق فقط في من يدفع.
+
+### تفصيل الفاتورة
 
 ```
-سعر الغرفة (قبل الخصم):     X ر.س
-الخصم (-X%):                - X ر.س   [يظهر فقط إن وُجد خصم]
-السعر الصافي:                X ر.س
-رسوم السياحة (2.5%):         X ر.س    [يظهر فقط إن كانت مفعّلة]
-المجموع قبل الضريبة:          X ر.س
-ضريبة القيمة المضافة (15%):  X ر.س
-الإجمالي:                    X ر.س
+─── الحالة A: على الضيف ─────────────────────────────────────
+سعر الغرفة (قبل الخصم):         X ر.س
+الخصم (-X%):                    - X ر.س    [يظهر فقط إن وُجد]
+السعر الصافي:                    X ر.س
+رسوم السياحة (2.5%):             X ر.س    [يظهر فقط إن فُعّلت]
+المجموع قبل الضريبة:              X ر.س
+ضريبة القيمة المضافة (15%):      X ر.س
+الإجمالي:                        X ر.س
+
+─── الحالة B: المنشأة تتحمل ──────────────────────────────────
+سعر الغرفة (قبل الخصم):         X ر.س
+الخصم (-X%):                    - X ر.س    [يظهر فقط إن وُجد]
+السعر الصافي:                    X ر.س
+رسوم السياحة (2.5%):             X ر.س    [يظهر فقط إن فُعّلت]
+الإجمالي (شامل الضريبة):         X ر.س
+ضريبة القيمة المضافة مشمولة:     X ر.س    [سطر إعلامي فقط]
 ```
 
 ### إعدادات الضرائب (Manager — منشأته فقط)
 
-| الإعداد | النوع | الافتراضي | القيود |
+| الإعداد | النوع | الافتراضي | الوصف |
 |---|---|---|---|
-| `tourism_tax_enabled` | BOOLEAN | false | Toggle — يفعّله Manager |
-| `tourism_tax_rate` | DECIMAL | 0.0250 (2.5%) | قابل للتعديل: 0% – 10% |
-| `vat_rate` | DECIMAL | 0.1500 (15%) | **ثابت** — غير قابل للتعديل |
+| `vat_rate` | DECIMAL(5,4) | 0.1500 | **ثابت** — غير قابل للتعديل |
+| `vat_on_guest` | BOOLEAN | true | true = الضيف يدفع VAT / false = المنشأة تتحمله |
+| `tourism_tax_enabled` | BOOLEAN | false | تفعيل رسوم السياحة |
+| `tourism_tax_rate` | DECIMAL(5,4) | 0.0250 | قابل للتعديل: 0% – 10% |
+| `tourism_tax_on_guest` | BOOLEAN | true | true = الضيف يدفع / false = المنشأة تتحمله (فقط إن مفعّلة) |
 | `vat_number` | VARCHAR | — | رقم التسجيل الضريبي في ZATCA |
 
-### صلاحيات الضرائب الجديدة
+### صلاحيات الضرائب
 
 ```
 tax_settings.view    → Admin + Manager
@@ -123,8 +151,9 @@ tax_settings.update  → Admin (الكل) + Manager (منشأته فقط)
 | المسار | الطريقة | الوظيفة | الصلاحية |
 |---|---|---|---|
 | `/settings/tax` | GET | عرض إعدادات الضرائب | `tax_settings.view` |
-| `/settings/tax` | PATCH | تحديث إعدادات (تفعيل/تعطيل السياحة) | `tax_settings.update` |
+| `/settings/tax` | PATCH | تحديث (من يتحمل VAT/السياحة، تفعيل/تعطيل) | `tax_settings.update` |
 | `/bookings/:id/tax-breakdown` | GET | تفصيل الضرائب لحجز محدد | `bookings.read` |
+| `/reports/tax` | GET | تقرير الضرائب المحصّلة (VAT + سياحة) | `reports.view` |
 
 ---
 
@@ -168,22 +197,24 @@ tax_settings.update  → Admin (الكل) + Manager (منشأته فقط)
 | district | VARCHAR? | الحي |
 | phone | VARCHAR? | هاتف المنشأة |
 | subscription_status | ENUM | TRIAL / ACTIVE / EXPIRED / SUSPENDED |
-| trial_ends_at | TIMESTAMP | تاريخ انتهاء التجربة (60 يوم من التسجيل) |
+| trial_ends_at | TIMESTAMP | تاريخ انتهاء التجربة (60 يوم) |
 | subscription_ends_at | TIMESTAMP? | تاريخ انتهاء الاشتراك |
 | is_active | BOOLEAN DEFAULT true | — |
 | is_deleted | BOOLEAN DEFAULT false | Soft Delete |
 | created_at | TIMESTAMP DEFAULT NOW() | — |
 
-### جدول `tax_settings` (جديد)
+### جدول `tax_settings`
 
 | الحقل | النوع | الغرض |
 |---|---|---|
 | id | UUID PK | — |
 | establishment_id | FK → establishments UNIQUE | منشأة واحدة = سجل ضرائب واحد |
-| vat_rate | DECIMAL(5,4) DEFAULT 0.1500 | ضريبة القيمة المضافة (ثابتة 15%) |
+| vat_rate | DECIMAL(5,4) DEFAULT 0.1500 | ثابت 15% — يُقرأ فقط |
+| **vat_on_guest** | BOOLEAN DEFAULT true | true = الضيف يدفع VAT / false = المنشأة تتحمله |
 | vat_number | VARCHAR? | رقم التسجيل الضريبي في ZATCA |
 | tourism_tax_enabled | BOOLEAN DEFAULT false | تفعيل رسوم السياحة |
-| tourism_tax_rate | DECIMAL(5,4) DEFAULT 0.0250 | معدل رسوم السياحة (2.5% افتراضي) |
+| tourism_tax_rate | DECIMAL(5,4) DEFAULT 0.0250 | معدل رسوم السياحة |
+| **tourism_tax_on_guest** | BOOLEAN DEFAULT true | true = الضيف يدفع / false = المنشأة تتحمل (إن فُعّلت) |
 | updated_by | FK → users? | آخر من عدّل الإعدادات |
 | updated_at | TIMESTAMP AUTO | — |
 
@@ -239,7 +270,7 @@ tax_settings.update  → Admin (الكل) + Manager (منشأته فقط)
 | total_spent | DECIMAL DEFAULT 0 | إجمالي الإنفاق |
 | created_at | TIMESTAMP | — |
 
-### جدول `direct_bookings` (مع الضرائب)
+### جدول `direct_bookings`
 
 | الحقل | النوع | الغرض |
 |---|---|---|
@@ -264,12 +295,14 @@ tax_settings.update  → Admin (الكل) + Manager (منشأته فقط)
 | discount_pct | DECIMAL DEFAULT 0 | نسبة الخصم |
 | discount_amount | DECIMAL DEFAULT 0 | مبلغ الخصم |
 | price_net | DECIMAL | السعر الصافي (بعد الخصم) |
-| **tourism_tax_enabled** | BOOLEAN | هل رسوم السياحة مفعّلة لهذا الحجز؟ |
-| **tourism_tax_rate** | DECIMAL DEFAULT 0 | المعدل المطبَّق وقت الحجز |
-| **tourism_tax_amount** | DECIMAL DEFAULT 0 | مبلغ رسوم السياحة |
-| **vat_rate** | DECIMAL DEFAULT 0.15 | معدل VAT المطبَّق وقت الحجز |
-| **vat_amount** | DECIMAL | مبلغ ضريبة القيمة المضافة |
-| **total_amount** | DECIMAL | الإجمالي الكلي شاملاً جميع الضرائب |
+| tourism_tax_enabled | BOOLEAN | هل رسوم السياحة مفعّلة لهذا الحجز؟ |
+| tourism_tax_on_guest | BOOLEAN | هل الضيف يتحملها؟ |
+| tourism_tax_rate | DECIMAL DEFAULT 0 | المعدل المطبَّق وقت الحجز |
+| tourism_tax_amount | DECIMAL DEFAULT 0 | مبلغ رسوم السياحة |
+| vat_rate | DECIMAL DEFAULT 0.15 | معدل VAT وقت الحجز |
+| vat_on_guest | BOOLEAN DEFAULT true | هل الضيف يتحمل VAT؟ |
+| vat_amount | DECIMAL | مبلغ ضريبة القيمة المضافة |
+| total_amount | DECIMAL | الإجمالي الذي يدفعه الضيف فعلياً |
 | status | ENUM | PENDING / CONFIRMED / CHECKED_IN / CHECKED_OUT / CANCELLED / NO_SHOW |
 | payment_status | ENUM | UNPAID / PARTIAL / PAID / REFUNDED |
 | paid_amount | DECIMAL DEFAULT 0 | المبلغ المدفوع |
@@ -285,10 +318,10 @@ tax_settings.update  → Admin (الكل) + Manager (منشأته فقط)
 |---|---|---|
 | booking_reviews | booking_id + overall + cleanliness + service + location + value (1-5) | تقييمات بعد الخروج |
 | night_audit_settings | establishment_id + scheduled_time + default_check_in_time + default_check_out_time + require_payment_before_close | إعدادات Night Audit |
-| night_audit_logs | establishment_id + audit_date + status + total_revenue + total_vat + total_tourism_tax + unsettled_count | سجل الإغلاق اليومي |
+| night_audit_logs | establishment_id + audit_date + status + total_revenue + total_vat + total_tourism_tax + total_vat_absorbed + total_tourism_absorbed + unsettled_count | سجل الإغلاق اليومي |
 | payment_devices | establishment_id + device_name + device_type (POS/MADA/CASH_DRAWER) + is_active | أجهزة الدفع |
 | payments | booking_id + device_id? + method + amount + status + settled_in_audit_id | المدفوعات |
-| zatca_invoices | booking_id + invoice_number + invoice_type (SIMPLIFIED/CREDIT) + xml_signed + qr_tlv_base64 + qr_image_base64 + zatca_status + vat_amount + tourism_tax_amount | فواتير ZATCA |
+| zatca_invoices | booking_id + invoice_number + invoice_type (SIMPLIFIED/CREDIT) + xml_signed + qr_tlv_base64 + qr_image_base64 + zatca_status + vat_amount + tourism_tax_amount + vat_absorbed | فواتير ZATCA |
 | housekeeping_tasks | room_id + assigned_to + task_type + priority + status + due_at | مهام التدبير المنزلي |
 | booking_app_settings | establishment_id + direct_discount + early_bird_discount + long_stay_discount + min_nights_long_stay + cancellation_policy + accepted_payments[] | إعدادات تطبيق الحجز |
 | promotions | establishment_id + code UNIQUE + discount_type + discount_value + valid_from + valid_until + max_uses + used_count | كودات الخصم |
@@ -357,8 +390,8 @@ payment_devices.manage
 | permissions.assign | ✅ | ✅ لموظفيه | ❌ | ❌ |
 | dashboard.view | ✅ | ✅ | ✅ محدود | ❌ |
 | reports.view/export | ✅ | ✅ | ❌ | ❌ |
-| **tax_settings.view** | ✅ | ✅ | ❌ | ❌ |
-| **tax_settings.update** | ✅ | ✅ منشأته | ❌ | ❌ |
+| tax_settings.view | ✅ | ✅ | ❌ | ❌ |
+| tax_settings.update | ✅ | ✅ منشأته | ❌ | ❌ |
 | settings.update | ✅ | ✅ منشأته | ❌ | ❌ |
 | rooms.create/update/delete | ✅ | ✅ | ❌ | ❌ |
 | rooms.read | ✅ | ✅ | ✅ | ❌ |
@@ -384,36 +417,41 @@ payment_devices.manage
 
 **الخصائص:**
 - بحث عن غرف بالتاريخ وعدد الأشخاص
-- حساب السعر تلقائياً مع تطبيق **جميع الضرائب**:
-  - VAT 15% إجباري
-  - رسوم السياحة 2.5% إن فعّلها Manager
+- حساب السعر تلقائياً مع تطبيق **جميع الضرائب** حسب إعدادات المنشأة
 - خصومات تلقائية (تُطبَّق على السعر الصافي قبل الضرائب):
-  - **خصم الحجز المباشر** (افتراضي 5%) — لتجاوز عمولات OTA 15-25%
-  - **خصم الحجز المبكر** (افتراضي 10% عند الحجز قبل 30 يوم)
+  - **خصم الحجز المباشر** (افتراضي 5%)
+  - **خصم الحجز المبكر** (افتراضي 10% قبل 30 يوم)
   - **خصم الإقامة الطويلة** (افتراضي 15% من 7 ليالٍ)
   - **كودات خصم مخصصة** من Manager
-- تسلسل عرض الأسعار لعميل الحجز:
+- تسلسل عرض الأسعار (يتكيف حسب `vat_on_guest` و `tourism_tax_on_guest`):
   ```
-  سعر الغرفة الأصلي: X ر.س
-  الخصم: - X ر.س
-  السعر الصافي: X ر.س
-  رسوم السياحة: + X ر.س  [إن وُجدت]
-  VAT 15%: + X ر.س
-  الإجمالي: X ر.س
+  ─── الحالة A: المنشأة تمرّر الضرائب للضيف ─────────
+  سعر الغرفة الأصلي:   X ر.س
+  الخصم:               - X ر.س
+  السعر الصافي:         X ر.س
+  رسوم السياحة:        + X ر.س  [إن وُجدت وعلى الضيف]
+  VAT 15%:             + X ر.س  [إن على الضيف]
+  الإجمالي:             X ر.س
+
+  ─── الحالة B: المنشأة تتحمل الضرائب ───────────────
+  سعر الغرفة الأصلي:   X ر.س
+  الخصم:               - X ر.س
+  السعر الصافي:         X ر.س
+  الإجمالي (شامل الضريبة): X ر.س
+  ضريبة مشمولة:        X ر.س  [سطر إعلامي]
   ```
 - الدفع: Moyasar (MADA + Visa + Apple Pay)
 - تأكيد الحجز: QR Code + SMS + Email
 - تتبع الحجز برقم الجوال — بدون تسجيل دخول
 - إلغاء مع احتساب الاسترداد حسب سياسة المنشأة
 - تقييم بعد الخروج (5 معايير × 5 نجوم)
-- عرض توفير العميل مقارنةً بـ OTA
 
 **إعدادات Manager لتطبيق الحجز:**
-- تفعيل/تعطيل رسوم السياحة
+- تحديد من يتحمل VAT (الضيف أم المنشأة)
+- تفعيل/تعطيل رسوم السياحة + تحديد من يتحملها
 - معدل رسوم السياحة (0–10%)
 - نسب الخصومات الثلاثة
-- سياسة الإلغاء
-- الحد الأدنى للإقامة
+- سياسة الإلغاء + الحد الأدنى للإقامة
 - طرق الدفع المقبولة
 
 ### 2. Night Audit
@@ -424,50 +462,48 @@ payment_devices.manage
 - تشغيل يدوي متاح لـ Manager
 - **شرط التشغيل:** لا يعمل إذا كانت هناك مدفوعات معلّقة
 - تحديث حالة الحجوزات: DUE_OUT → No-Show أو تمديد
-- تثبيت الإيرادات (تشمل: السعر الصافي + رسوم السياحة + VAT) ومنع تعديلها
+- تثبيت الإيرادات ومنع تعديلها
 - توليد تقرير PDF يشمل:
-  - إجمالي الإيرادات
+  - إجمالي الإيرادات (ما دفعه الضيوف فعلياً)
   - إجمالي VAT المحصّل
-  - **إجمالي رسوم السياحة المحصّلة** (إن كانت مفعّلة)
+  - إجمالي رسوم السياحة المحصّلة
+  - **إجمالي الضرائب التي تحملتها المنشأة** (إن وُجدت)
   - تفصيل أجهزة الدفع
-- ربط أجهزة الدفع: POS + MADA + Visa + CASH_DRAWER
-- تعديل وقت الدخول/الخروج الافتراضي: **Manager فقط**
 
-### 3. ZATCA — الفاتورة الإلكترونية (مُحدَّثة بالضرائب)
+### 3. ZATCA — الفاتورة الإلكترونية
 
 **الخصائص:**
 - إصدار فاتورة مبسّطة تلقائياً عند Check-out
-- **بنود الفاتورة تشمل:**
+- **بنود الفاتورة تشمل دائماً (بغض النظر عمّن يتحمل):**
   - السعر الصافي للغرفة
   - رسوم السياحة (سطر منفصل إن كانت مفعّلة)
-  - مبلغ VAT (15% على القاعدة الضريبية = صافي + سياحة)
-  - الإجمالي الكلي
-- QR Code بمعيار TLV الرسمي من ZATCA (5 حقول مشفّرة Base64):
+  - مبلغ VAT (15% على القاعدة الضريبية)
+  - الإجمالي
+  - ملاحظة إن كانت الضريبة مشمولة في السعر
+- QR Code بمعيار TLV الرسمي من ZATCA (5 حقول):
   1. اسم البائع
   2. رقم التسجيل الضريبي
   3. تاريخ ووقت الفاتورة
-  4. إجمالي الفاتورة (شامل كل الضرائب)
+  4. إجمالي الفاتورة (القاعدة الضريبية الكاملة)
   5. مبلغ VAT
-- QR قابل للقراءة بأي جهاز + التحقق منه
 - XML موقّع وفق UBL 2.1
 - إرسال للـ ZATCA API (Sandbox → Production)
-- صفحة Scanner بالكاميرا للتحقق من QR
 - فاتورة دائن (Credit Note) عند الاسترداد
 
 ### 4. التقارير و KPI
 
-**المؤشرات الحية (Real-time):**
+**المؤشرات الحية:**
 - معدل الإشغال (Occupancy Rate)
 - متوسط سعر الغرفة (ADR)
 - الإيراد لكل غرفة متاحة (RevPAR)
 - إجمالي الإيرادات اليومية
-- **إجمالي VAT المحصّل يومياً**
-- **إجمالي رسوم السياحة المحصّلة يومياً**
+- إجمالي VAT المحصّل (مدفوع من الضيف + مُتحمَّل من المنشأة)
+- إجمالي رسوم السياحة
 
 **التقارير:**
 - تقرير الإشغال: يومي / أسبوعي / شهري
 - تقرير الإيرادات: حسب المصدر + نوع الغرفة + طريقة الدفع
-- **تقرير الضرائب:** VAT المحصّل + رسوم السياحة المحصّلة + الإجمالي لأي فترة
+- **تقرير الضرائب:** VAT + سياحة + مُتحمَّل من المنشأة + إجمالي أي فترة
 - تقرير الضيوف: توزيع الدول والمناطق (Shamoos)
 - تقرير التقييمات: Radar Chart لـ 5 معايير
 - توقعات الإشغال: 7 / 14 / 30 يوم
@@ -481,14 +517,12 @@ payment_devices.manage
 - لوحة Kanban: PENDING → IN_PROGRESS → DONE
 - أنواع المهام: CLEANING / INSPECTION / MAINTENANCE / TURNDOWN
 - أولوية: LOW / MEDIUM / HIGH / URGENT
-- تعيين المهمة لموظف محدد
 
 ### 6. Channel Manager
 
 - مزامنة التوفر مع: Booking.com + Airbnb + Expedia + Agoda
 - تحديث التوفر تلقائياً عند كل حجز أو إلغاء
 - استقبال حجوزات OTA عبر Webhook
-- سجل نجاح/فشل كل عملية مزامنة
 - Retry Queue للعمليات الفاشلة
 
 ---
@@ -497,27 +531,26 @@ payment_devices.manage
 
 | المتطلب | التفاصيل |
 |---|---|
-| كلمات المرور | bcrypt rounds=12 أو argon2id — لا تخزين كنص صريح |
+| كلمات المرور | bcrypt rounds=12 — لا تخزين كنص صريح |
 | JWT | Access Token 15 دقيقة (في الذاكرة) + Refresh Token 7 أيام (في DB كـ Hash) |
 | Cookie | HttpOnly + Secure + SameSite=Strict + Path=/auth/refresh |
 | Rate Limiting | 5 محاولات / 15 دقيقة لكل IP على مسارات Auth |
 | قفل الحساب | 30 دقيقة بعد 5 محاولات فاشلة متتالية |
 | رسالة الخطأ | "بيانات الدخول غير صحيحة" — لا يكشف سبب الفشل |
-| SQL Injection | Prisma Parameterized Queries دائماً — لا Raw SQL |
+| SQL Injection | Prisma Parameterized Queries دائماً |
 | XSS | DOMPurify (Frontend) + sanitize-html (Backend) |
-| CSRF | Double Submit Cookie Pattern أو SameSite=Strict |
+| CSRF | Double Submit Cookie أو SameSite=Strict |
 | Input Validation | class-validator + class-transformer على كل DTO |
 | Security Headers | Helmet.js في NestJS |
 | CORS | Whitelist صريح — لا * في Production |
-| Escalation | لا مستخدم يرفع صلاحياته بنفسه — OwnershipGuard |
-| Admin Protection | لا يمكن حذف أو تعديل حساب Admin من أي حساب آخر |
-| Row Isolation | Manager يرى منشأته فقط — EstablishmentContextInterceptor |
+| Escalation | OwnershipGuard — لا مستخدم يرفع صلاحياته بنفسه |
+| Admin Protection | لا يمكن حذف أو تعديل Admin من أي حساب آخر |
+| Row Isolation | EstablishmentContextInterceptor — Manager يرى منشأته فقط |
 | Guest Isolation | GuestGuard — مسارات Guest لا تقبل Staff tokens |
-| الأسرار | جميع المفاتيح في .env — لا في الكود |
-| Audit Logs | كل عملية حساسة تُسجَّل تلقائياً بـ AuditLogInterceptor |
+| Tax Integrity | vat_rate ثابت في الكود — لا يُعدَّل من الواجهة / Manager يتحكم في التحميل فقط |
+| Audit Logs | كل عملية حساسة تُسجَّل بـ AuditLogInterceptor |
 | Soft Delete | جميع الجداول الرئيسية: is_deleted + deleted_at |
 | ZATCA Keys | شهادة + مفتاح ZATCA في .env فقط |
-| Tax Integrity | معدل VAT ثابت في الكود — لا يُعدَّل من واجهة المستخدم |
 
 ---
 
@@ -554,10 +587,10 @@ EstablishmentContextInterceptor  // يضبط establishment_id تلقائياً �
 
 | الطريقة | المسار | الوظيفة | الصلاحية |
 |---|---|---|---|
-| GET | /users | قائمة المستخدمين مع بحث وتصفية | users.read |
+| GET | /users | قائمة المستخدمين | users.read |
 | POST | /users | إنشاء موظف جديد | users.create |
 | PATCH | /users/:id | تعديل بيانات مستخدم | users.update |
-| DELETE | /users/:id | حذف ناعم Soft Delete | users.delete |
+| DELETE | /users/:id | حذف ناعم | users.delete |
 | PATCH | /users/:id/activate | تفعيل الحساب | users.update |
 | POST | /users/:id/assign-role | تعيين دور لمستخدم | permissions.assign |
 | GET | /establishments | كل المنشآت — Admin فقط | Admin |
@@ -568,98 +601,77 @@ EstablishmentContextInterceptor  // يضبط establishment_id تلقائياً �
 | الطريقة | المسار | الوظيفة | الصلاحية |
 |---|---|---|---|
 | GET | /settings/tax | عرض إعدادات الضرائب | tax_settings.view |
-| PATCH | /settings/tax | تحديث رسوم السياحة (تفعيل/تعطيل/معدل) | tax_settings.update |
+| PATCH | /settings/tax | تحديث (vat_on_guest / tourism_tax_on_guest / tourism_tax_enabled) | tax_settings.update |
 | GET | /bookings/:id/tax-breakdown | تفصيل الضرائب لحجز محدد | bookings.read |
-| GET | /reports/tax | تقرير الضرائب المحصّلة (VAT + سياحة) | reports.view |
-
-### الأدوار والصلاحيات
-
-| الطريقة | المسار | الوظيفة | الصلاحية |
-|---|---|---|---|
-| GET | /roles | قائمة الأدوار | roles.read |
-| POST | /roles | إنشاء دور جديد | roles.create |
-| PATCH | /roles/:id | تعديل الدور | roles.update |
-| DELETE | /roles/:id | حذف دور غير نظامي | roles.delete |
-| GET | /permissions | قائمة الصلاحيات | permissions.read |
-| POST | /roles/:id/permissions | ربط صلاحيات بدور | permissions.assign |
-| DELETE | /roles/:id/permissions/:pid | إزالة صلاحية من دور | permissions.assign |
+| GET | /reports/tax | تقرير الضرائب (VAT + سياحة + مُتحمَّل من المنشأة) | reports.view |
 
 ### PMS — الغرف والضيوف والحجوزات
 
 | الطريقة | المسار | الوظيفة | الصلاحية |
 |---|---|---|---|
-| GET | /rooms/availability | فحص التوفر ?checkIn&checkOut | rooms.read |
-| POST | /rooms | إضافة غرفة جديدة | rooms.create |
+| GET | /rooms/availability | فحص التوفر | rooms.read |
+| POST | /rooms | إضافة غرفة | rooms.create |
 | PATCH | /rooms/:id/status | تغيير حالة الغرفة | rooms.change_status |
 | GET | /guests | قائمة الضيوف | guests.read |
-| POST | /guests | تسجيل ضيف جديد | guests.create |
+| POST | /guests | تسجيل ضيف | guests.create |
 | GET | /guests/:id/history | سجل إقامات ضيف | guests.read |
 | PATCH | /guests/:id/blacklist | إضافة لقائمة الحظر | guests.blacklist |
 | GET | /bookings | قائمة الحجوزات | bookings.read |
-| POST | /bookings | إنشاء حجز جديد (مع حساب الضرائب) | bookings.create |
+| POST | /bookings | إنشاء حجز (يُحسب الضرائب حسب إعدادات المنشأة) | bookings.create |
 | POST | /bookings/:id/check-in | تسجيل الدخول الفعلي | bookings.check_in |
 | POST | /bookings/:id/check-out | تسجيل الخروج + فاتورة ZATCA | bookings.check_out |
-| POST | /bookings/:id/review | تسجيل تقييم بعد الخروج | bookings.update |
+| POST | /bookings/:id/review | تسجيل تقييم | bookings.update |
 
 ### Night Audit + ZATCA + Housekeeping
 
 | الطريقة | المسار | الوظيفة | الصلاحية |
 |---|---|---|---|
 | GET | /night-audit/settings | عرض إعدادات Night Audit | night_audit.view |
-| PATCH | /night-audit/settings | تعديل الإعدادات — Manager فقط | night_audit.settings |
-| POST | /night-audit/run | تشغيل Night Audit يدوياً | night_audit.run |
+| PATCH | /night-audit/settings | تعديل الإعدادات | night_audit.settings |
+| POST | /night-audit/run | تشغيل يدوي | night_audit.run |
 | GET | /night-audit/:date/report | تقرير يوم محدد PDF | night_audit.view |
-| POST | /zatca/invoices/:id/generate | إصدار فاتورة ZATCA (VAT + سياحة) | invoices.create |
+| POST | /zatca/invoices/:id/generate | إصدار فاتورة ZATCA | invoices.create |
 | GET | /zatca/invoices/:id/qr | صورة QR للفاتورة | invoices.view |
-| POST | /zatca/verify-qr | التحقق من QR — عام بدون JWT | عام |
+| POST | /zatca/verify-qr | التحقق من QR — عام | عام |
 | GET | /housekeeping | لوحة مهام التدبير | housekeeping.view |
-| POST | /housekeeping | إنشاء مهمة تدبير | housekeeping.create |
+| POST | /housekeeping | إنشاء مهمة | housekeeping.create |
 
-### تطبيق الحجز المباشر (مع الضرائب)
+### تطبيق الحجز المباشر
 
 | الطريقة | المسار | الوظيفة | الصلاحية |
 |---|---|---|---|
-| GET | /book/:slug | صفحة المنشأة العامة | عام — بدون JWT |
-| GET | /book/:slug/search | البحث + عرض السعر الكامل (صافي + ضرائب) | عام |
+| GET | /book/:slug | صفحة المنشأة العامة | عام |
+| GET | /book/:slug/search | بحث + عرض السعر حسب إعدادات الضرائب | عام |
 | POST | /book/:slug/check-promo | التحقق من كود خصم | عام |
-| POST | /book/:slug/price-preview | معاينة السعر التفصيلي مع جميع الضرائب | عام |
-| POST | /book/:slug/create | إنشاء حجز مباشر (يُحسب الضرائب من DB) | عام |
+| POST | /book/:slug/price-preview | معاينة السعر التفصيلي (يتكيف مع vat_on_guest) | عام |
+| POST | /book/:slug/create | إنشاء حجز مباشر | عام |
 | POST | /book/:slug/payment | بدء عملية الدفع Moyasar | عام |
 | GET | /book/my-booking | تتبع الحجز برقم الهاتف | عام |
 | POST | /book/my-booking/cancel | إلغاء الحجز | عام |
 | PATCH | /booking-app/settings | إعدادات تطبيق الحجز | booking_app.settings |
 | POST | /booking-app/promotions | إنشاء كود خصم | booking_app.promotions |
-| GET | /booking-app/savings-report | تقرير الوفر من العمولات | booking_app.view |
 
 ### التقارير و KPI
 
 | الطريقة | المسار | الوظيفة | الصلاحية |
 |---|---|---|---|
-| GET | /reports/kpis | مؤشرات KPI الحية (+ إجمالي الضرائب) | dashboard.analytics |
-| GET | /reports/occupancy | تقرير الإشغال يومي/شهري | reports.view |
-| GET | /reports/revenue | تقرير الإيرادات بالمصدر | reports.view |
-| GET | /reports/tax | تقرير VAT + رسوم السياحة | reports.view |
-| GET | /reports/guests | تقرير الضيوف بالدول والمناطق | reports.view |
+| GET | /reports/kpis | مؤشرات KPI الحية | dashboard.analytics |
+| GET | /reports/occupancy | تقرير الإشغال | reports.view |
+| GET | /reports/revenue | تقرير الإيرادات | reports.view |
+| GET | /reports/tax | تقرير VAT + سياحة + مُتحمَّل | reports.view |
+| GET | /reports/guests | تقرير الضيوف | reports.view |
 | GET | /reports/reviews | تقرير التقييمات | reports.view |
-| GET | /reports/forecast | توقعات الإشغال ?days=7/14/30 | reports.view |
-| GET | /reports/savings | الوفر من العمولات vs OTA | reports.view |
+| GET | /reports/forecast | توقعات الإشغال | reports.view |
 | GET | /audit-logs | سجل التدقيق | audit_logs.view |
 
 ---
 
 ## عاشراً: الدول والمناطق
 
-مكوّن مشترك `CountryRegionSelect.tsx` يُستخدم في:
-- نموذج تسجيل المنشأة
-- نموذج إنشاء حجز مباشر
-- ملف الضيف
-- إعدادات المنشأة
-- تقرير الضيوف (Shamoos)
-
-**السلوك:**
-- عند اختيار المملكة العربية السعودية: قائمة منسدلة بالمناطق الـ 13
+مكوّن مشترك `CountryRegionSelect.tsx`:
+- عند اختيار المملكة: قائمة منسدلة بالمناطق الـ 13
 - عند اختيار دولة أخرى: حقل نصي حر
-- المناطق السعودية الـ 13: الرياض / مكة المكرمة / المدينة المنورة / القصيم / المنطقة الشرقية / عسير / تبوك / حائل / الحدود الشمالية / جازان / نجران / الباحة / الجوف
+- **المناطق الـ 13:** الرياض / مكة المكرمة / المدينة المنورة / القصيم / المنطقة الشرقية / عسير / تبوك / حائل / الحدود الشمالية / جازان / نجران / الباحة / الجوف
 - مخزنة ثابتة في `src/common/data/locations.ts` — لا DB
 
 ---
@@ -667,11 +679,11 @@ EstablishmentContextInterceptor  // يضبط establishment_id تلقائياً �
 ## حادي عشر: نظام الاشتراكات
 
 - **فترة تجربة مجانية:** 60 يوماً تبدأ تلقائياً عند التسجيل
-- **رقم تسلسلي:** يُولَّد تلقائياً (1، 2، 3...) لكل منشأة
-- **التجديد:** برقم المنشأة التسلسلي فقط — Admin يجدّد
-- **حالات الاشتراك:** TRIAL / ACTIVE / EXPIRED / SUSPENDED
-- `SubscriptionGuard` يمنع الوصول عند انتهاء الاشتراك
-- تحذيرات تلقائية قبل 7 أيام و3 أيام من الانتهاء
+- **رقم تسلسلي:** يُولَّد تلقائياً لكل منشأة
+- **التجديد:** برقم المنشأة التسلسلي — Admin يجدّد
+- **حالات:** TRIAL / ACTIVE / EXPIRED / SUSPENDED
+- `SubscriptionGuard` يمنع الوصول عند الانتهاء
+- تحذيرات تلقائية قبل 7 أيام و3 أيام
 
 ---
 
@@ -682,75 +694,111 @@ duyuf-platform/
 ├── apps/
 │   ├── backend/  (NestJS)
 │   │   └── src/
-│   │       ├── auth/           -- المصادقة + strategies + DTOs
-│   │       ├── users/          -- إدارة المستخدمين
-│   │       ├── establishments/ -- المنشآت
-│   │       ├── subscriptions/  -- الاشتراكات
-│   │       ├── roles/          -- الأدوار
-│   │       ├── permissions/    -- الصلاحيات
-│   │       ├── tax-settings/   -- إعدادات الضرائب (جديد)
-│   │       ├── rooms/          -- الغرف
-│   │       ├── room-types/     -- أنواع الغرف
-│   │       ├── guests/         -- ملفات الضيوف
-│   │       ├── bookings/       -- الحجوزات (Staff)
-│   │       ├── booking-app/    -- تطبيق الحجز المباشر
-│   │       ├── night-audit/    -- Night Audit
-│   │       ├── zatca/          -- ZATCA + QR
-│   │       ├── housekeeping/   -- التدبير المنزلي
-│   │       ├── reports/        -- التقارير و KPI
-│   │       ├── audit-logs/     -- سجل التدقيق
+│   │       ├── auth/
+│   │       ├── users/
+│   │       ├── establishments/
+│   │       ├── subscriptions/
+│   │       ├── roles/
+│   │       ├── permissions/
+│   │       ├── tax-settings/        ← إعدادات الضرائب
+│   │       ├── rooms/
+│   │       ├── room-types/
+│   │       ├── guests/
+│   │       ├── bookings/
+│   │       ├── booking-app/
+│   │       ├── night-audit/
+│   │       ├── zatca/
+│   │       ├── housekeeping/
+│   │       ├── reports/
+│   │       ├── audit-logs/
 │   │       ├── common/
-│   │       │   ├── guards/     -- JwtAuth|Roles|Permissions|Subscription|Ownership|Guest
-│   │       │   ├── interceptors/ -- AuditLog + EstablishmentContext
-│   │       │   ├── services/   -- TaxCalculator (Service مشترك للضرائب)
-│   │       │   └── data/       -- locations.ts (ثابت — لا DB)
+│   │       │   ├── guards/
+│   │       │   ├── interceptors/
+│   │       │   ├── services/        ← TaxCalculatorService
+│   │       │   └── data/            ← locations.ts
 │   │       ├── mail/ + sms/
 │   │       └── prisma/
-│   │           ├── schema.prisma
-│   │           └── seed.ts
 │   │
 │   └── frontend/ (Next.js 14)
 │       └── app/
-│           ├── (auth)/         -- login|register|verify|forgot|reset
+│           ├── (auth)/
 │           ├── (dashboard)/
-│           │   ├── bookings/   -- + check-in + check-out + review
+│           │   ├── bookings/
 │           │   ├── settings/
-│           │   │   └── tax/    -- إعدادات الضرائب (جديد)
+│           │   │   └── tax/         ← إعدادات الضرائب
 │           │   ├── night-audit/
 │           │   ├── zatca/scanner
-│           │   ├── reports/    -- + تقرير الضرائب
+│           │   ├── reports/
 │           │   └── booking-app/
-│           ├── book/[slug]/    -- صفحات الحجز العامة (Public)
-│           └── guest/          -- ملف الضيف (OTP)
+│           ├── book/[slug]/
+│           └── guest/
 ```
 
 ### `TaxCalculatorService` (خدمة مشتركة)
 
 ```typescript
 // src/common/services/tax-calculator.service.ts
+export interface TaxBreakdown {
+  base_price: number;
+  discount_amount: number;
+  price_net: number;
+  tourism_tax_amount: number;   // دائماً يُحسب — صفر إن معطّلة
+  vat_amount: number;           // دائماً يُحسب — لـ ZATCA
+  total_amount: number;         // ما يدفعه الضيف فعلياً
+  vat_absorbed: number;         // ما تتحمله المنشأة من VAT (للتقارير)
+  tourism_absorbed: number;     // ما تتحمله المنشأة من السياحة (للتقارير)
+}
+
 @Injectable()
 export class TaxCalculatorService {
   calculate(params: {
     base_price: number;
     discount_pct: number;
+    vat_rate: number;              // 0.15 ثابت
+    vat_on_guest: boolean;         // true = الضيف يدفع / false = المنشأة تتحمل
     tourism_tax_enabled: boolean;
-    tourism_tax_rate: number;   // 0.025 افتراضي
-    vat_rate: number;            // 0.15 ثابت
+    tourism_tax_rate: number;      // 0.025 افتراضي
+    tourism_tax_on_guest: boolean; // true = الضيف يدفع / false = المنشأة تتحمل
   }): TaxBreakdown {
+    const { base_price, discount_pct, vat_rate,
+            vat_on_guest, tourism_tax_enabled,
+            tourism_tax_rate, tourism_tax_on_guest } = params;
+
     const price_net = base_price * (1 - discount_pct / 100);
-    const tourism_tax_amount = tourism_tax_enabled
-      ? price_net * tourism_tax_rate
-      : 0;
-    const vat_base = price_net + tourism_tax_amount;
-    const vat_amount = vat_base * vat_rate;
-    return {
-      base_price,
-      discount_amount: base_price - price_net,
-      price_net,
-      tourism_tax_amount,
-      vat_amount,
-      total_amount: vat_base + vat_amount,
-    };
+    const discount_amount = base_price - price_net;
+
+    // رسوم السياحة (إن فُعّلت)
+    const raw_tourism = tourism_tax_enabled ? price_net * tourism_tax_rate : 0;
+    const tourism_tax_amount = tourism_tax_on_guest ? raw_tourism : 0; // ما يدفعه الضيف
+    const tourism_absorbed   = tourism_tax_on_guest ? 0 : raw_tourism; // ما تتحمله المنشأة
+
+    // حساب VAT
+    if (vat_on_guest) {
+      // الضيف يدفع VAT فوق السعر
+      const vat_base   = price_net + raw_tourism;
+      const vat_amount = vat_base * vat_rate;
+      return {
+        base_price, discount_amount, price_net,
+        tourism_tax_amount: raw_tourism,
+        vat_amount,
+        total_amount: vat_base + vat_amount,
+        vat_absorbed: 0,
+        tourism_absorbed,
+      };
+    } else {
+      // المنشأة تتحمل VAT — يُستخرج من داخل السعر
+      const guest_subtotal = price_net + tourism_tax_amount; // ما يدفعه الضيف
+      const vat_base       = guest_subtotal / (1 + vat_rate);
+      const vat_amount     = guest_subtotal - vat_base;
+      return {
+        base_price, discount_amount, price_net,
+        tourism_tax_amount,
+        vat_amount,
+        total_amount: guest_subtotal,
+        vat_absorbed: vat_amount,
+        tourism_absorbed,
+      };
+    }
   }
 }
 ```
@@ -805,7 +853,7 @@ ZATCA_VAT_NUMBER=REPLACE
 ZATCA_CERTIFICATE=REPLACE
 ZATCA_PRIVATE_KEY=REPLACE
 
-# === Tax (System Defaults — المعدل الثابت في الكود فقط) ===
+# === Tax (معدلات ثابتة — لا تتغير من الواجهة) ===
 VAT_RATE=0.15
 DEFAULT_TOURISM_TAX_RATE=0.025
 ```
@@ -821,12 +869,12 @@ DEFAULT_TOURISM_TAX_RATE=0.025
 | 3 | الأدوار والصلاحيات | Seed الأدوار والصلاحيات + RBAC Guards + لوحة الإدارة |
 | 4 | الاشتراكات | Serial Number تلقائي + Trial 60 يوم + Subscription Guard |
 | 5 | بيانات الدول والمناطق | locations.ts + CountryRegionSelect |
-| 6 | **نظام الضرائب** | TaxCalculatorService + tax_settings Table + API + واجهة Manager |
+| **6** | **نظام الضرائب** | **TaxCalculatorService + tax_settings Migration + API + واجهة Manager** |
 | 7 | الغرف والضيوف | RoomTypes + Rooms + Guests + Room Map |
 | 8 | الحجوزات (Staff) | Bookings + Check-in + Check-out + Review + حساب الضرائب |
-| 9 | Night Audit | Settings + PaymentDevices + Cron ديناميكي + تقرير PDF (+ الضرائب) |
-| 10 | ZATCA | TLV Builder + QR Generator + QR Scanner + ZATCA API (+ رسوم السياحة) |
-| 11 | تطبيق الحجز المباشر | Public Pages + Pricing Engine (+ الضرائب) + Promotions + Payment |
+| 9 | Night Audit | Settings + PaymentDevices + Cron ديناميكي + تقرير PDF |
+| 10 | ZATCA | TLV Builder + QR Generator + QR Scanner + ZATCA API |
+| 11 | تطبيق الحجز المباشر | Public Pages + Pricing Engine + Promotions + Payment |
 | 12 | التقارير و KPI | Dashboard KPIs + تقرير الضرائب + 6 تقارير + تصدير PDF/Excel |
 | 13 | Housekeeping | Kanban + Auto-create on Checkout |
 | 14 | Channel Manager | مزامنة OTA + Webhook |
@@ -837,36 +885,36 @@ DEFAULT_TOURISM_TAX_RATE=0.025
 ## خامس عشر: قائمة مراجعة ما قبل الإطلاق
 
 ### الأمان
-- [ ] NODE_ENV=production في بيئة الإنتاج
-- [ ] HTTPS + SSL Certificate فعّال
+- [ ] NODE_ENV=production
+- [ ] HTTPS + SSL Certificate
 - [ ] تغيير كلمة مرور Admin الافتراضية فور أول تشغيل
 - [ ] CORS بالنطاقات الصحيحة فقط
 - [ ] .env لا يوجد في Git
-- [ ] Refresh Token Rotation عند كل تجديد
-- [ ] Rate Limiting فعّال على مسارات Auth
+- [ ] Refresh Token Rotation فعّال
+- [ ] Rate Limiting فعّال
 - [ ] Swagger Docs محظور في Production
 
-### الضرائب (جديد)
-- [ ] التحقق من أن VAT_RATE=0.15 ثابت لا يمكن تغييره من الواجهة
-- [ ] اختبار حساب الضرائب: حجز بدون سياحة / بسياحة / بخصم + سياحة
-- [ ] التحقق من عرض الضرائب بشكل صحيح في صفحة الحجز المباشر
-- [ ] التحقق من أن فاتورة ZATCA تشمل رسوم السياحة كسطر منفصل
-- [ ] اختبار تقرير الضرائب لفترة مخصصة
-- [ ] اختبار Night Audit: إجمالي رسوم السياحة محسوب بشكل صحيح
+### الضرائب
+- [ ] التحقق من أن VAT_RATE=0.15 ثابت — لا يُعدَّل من الواجهة
+- [ ] اختبار الحالة A: الضيف يدفع VAT + سياحة
+- [ ] اختبار الحالة B: المنشأة تتحمل VAT — الإجمالي للضيف لا يشمل VAT
+- [ ] اختبار الحالة C: الضيف يدفع VAT + المنشأة تتحمل السياحة
+- [ ] التحقق من أن ZATCA تتضمن vat_amount الصحيح في جميع الحالات
+- [ ] اختبار Night Audit: عمود total_vat_absorbed محسوب بشكل صحيح
+- [ ] اختبار تقرير الضرائب: الضرائب المُتحمَّلة من المنشأة تظهر منفصلة
 
 ### قاعدة البيانات
-- [ ] Prisma Migrations نُفّذت بنجاح في Production
-- [ ] Seed Data: أدوار + صلاحيات + Admin + tax_settings افتراضية
-- [ ] Database Connection Pooling (PgBouncer)
+- [ ] Prisma Migrations نُفّذت في Production
+- [ ] Seed: أدوار + صلاحيات + Admin + tax_settings افتراضية لكل منشأة
+- [ ] Database Connection Pooling
 - [ ] Backup تلقائي يومي
 
 ### الوظائف
-- [ ] اختبار Night Audit في Staging أولاً
-- [ ] اختبار ZATCA في Sandbox قبل Production
+- [ ] اختبار Night Audit في Staging
+- [ ] اختبار ZATCA في Sandbox
 - [ ] اختبار بوابة الدفع Moyasar
-- [ ] اختبار إرسال SMS + البريد الإلكتروني
+- [ ] اختبار SMS + البريد الإلكتروني
 - [ ] اختبار QR Scanner على Android + iOS
-- [ ] اختبار جميع سيناريوهات الصلاحيات
 
 ---
 
@@ -874,18 +922,18 @@ DEFAULT_TOURISM_TAX_RATE=0.025
 
 | السؤال | الإجابة |
 |---|---|
-| هل VAT ثابت 15% ولا يمكن تغييره؟ | ✅ ثابت في الكود + TaxCalculatorService |
-| هل رسوم السياحة اختيارية لكل منشأة؟ | ✅ Manager يفعّلها/يعطّلها من الإعدادات |
-| هل الضرائب محسوبة بشكل صحيح في ZATCA؟ | ✅ رسوم السياحة سطر منفصل في XML |
+| هل VAT ثابت 15% لا يتغير؟ | ✅ ثابت في TaxCalculatorService — vat_rate لا تُعدَّل من الواجهة |
+| هل المدير يتحكم في من يتحمل VAT؟ | ✅ vat_on_guest toggle في tax_settings |
+| هل رسوم السياحة اختيارية؟ | ✅ tourism_tax_enabled + tourism_tax_on_guest |
+| هل ZATCA تحصل على vat_amount الصحيح؟ | ✅ دائماً — بغض النظر عمّن يتحمل |
+| هل الفاتورة تعكس الواقع الصحيح؟ | ✅ تتكيف مع الحالتين A/B |
 | هل نظام تسجيل الدخول آمن؟ | ✅ bcrypt + Rate Limiting + قفل الحساب |
 | هل الأدوار منفصلة عن الصلاحيات؟ | ✅ جداول منفصلة + DB-driven |
-| هل تم منع التصعيد غير المشروع؟ | ✅ OwnershipGuard + EstablishmentContext |
 | هل Admin يرى جميع البيانات؟ | ✅ لوحة Admin: إجمالي كل المنشآت |
-| هل الموظفون يُنشأون من Manager فقط؟ | ✅ مقيّد بـ EstablishmentContextInterceptor |
-| هل تطبيق الحجز يعرض الضرائب بوضوح؟ | ✅ تفصيل كامل: صافي + سياحة + VAT + إجمالي |
-| هل Night Audit يحسب الضرائب؟ | ✅ تقرير يشمل VAT + رسوم السياحة |
-| هل الكود قابل للصيانة والتوسع؟ | ✅ طبقات واضحة + TaxCalculatorService مشترك |
+| هل الموظفون يُنشأون من Manager فقط؟ | ✅ EstablishmentContextInterceptor |
+| هل تطبيق الحجز يعرض الضرائب بوضوح؟ | ✅ يتكيف مع إعدادات المنشأة |
+| هل Night Audit يحسب الضرائب المُتحمَّلة؟ | ✅ total_vat_absorbed + total_tourism_absorbed |
 
 ---
 
-**أخرج النسخة النهائية المنظمة الكاملة القابلة للتنفيذ مباشرة، مع الكود الكامل لكل مكون، مصقولاً ومرتباً بالترتيب الموضح في هذا البرومبت. ابدأ بـ TaxCalculatorService ثم tax_settings Migration ثم ربط الضريبة بكل وحدة.**
+**أخرج النسخة النهائية المنظمة الكاملة القابلة للتنفيذ مباشرة، مع الكود الكامل لكل مكون، مصقولاً ومرتباً بالترتيب الموضح. ابدأ بـ TaxCalculatorService ثم tax_settings Migration ثم ربط الضريبة بكل وحدة.**
