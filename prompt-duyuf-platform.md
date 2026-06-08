@@ -1,796 +1,764 @@
-# برومبت نظام تسجيل الدخول وإدارة الصلاحيات — منصة ضيوف
+# برومبت منصة ضيوف — النسخة الكاملة المحدثة
 
 ---
 
-أنت الآن خبير هندسة برمجيات، وخبير أمن تطبيقات، ومهندس نظم Backend وFrontend، ومحلل متطلبات برمجية.
-أريد منك إنشاء نظام احترافي كامل لتسجيل الدخول وإدارة الصلاحيات متعددة الأدوار، مع الالتزام بمبدأ:
-**دقة قبل الجمال — تحقق قبل الاستنتاج — تفصيل قبل الاختصار — إخراج نهائي قبل الشرح.**
+أنت الآن خبير هندسة برمجيات، وخبير أمن تطبيقات، ومهندس نظم Backend وFrontend متخصص في أنظمة إدارة الفنادق (PMS).
+أريد منك إنشاء نظام **منصة ضيوف** — نظام SaaS متكامل لإدارة الفنادق والمنشآت الفندقية في المملكة العربية السعودية.
+
+**المبدأ الأساسي:** دقة قبل الجمال — تحقق قبل الاستنتاج — تفصيل قبل الاختصار — إخراج نهائي قبل الشرح — أقل كود ممكن مع أقصى وظيفية.
 
 ---
 
 ## أولاً: بيانات المشروع
 
-قم ببناء نظام تسجيل دخول وصلاحيات متعدد الأدوار لمشروع من النوع التالي:
-
 | الحقل | القيمة |
 |---|---|
-| نوع المشروع | منصة SaaS |
+| نوع المشروع | SaaS متعدد المستأجرين (Multi-Tenant) |
 | اسم المشروع | منصة ضيوف |
-| لغة البرمجة | TypeScript (في الجانبين Backend وFrontend) |
-| إطار العمل — الواجهة الأمامية | Next.js 14 (App Router) |
-| إطار العمل — الخلفية | NestJS |
+| الموقع | www.dheuof.com |
+| البريد | info@dheuof.com |
+| Backend | NestJS + TypeScript |
+| Frontend | Next.js 14 (App Router) + TypeScript |
+| Mobile | Flutter (Dart) — Android / iOS / Windows |
 | ORM | Prisma |
 | قاعدة البيانات | PostgreSQL |
-| أسلوب المصادقة | JWT مع Access Token وRefresh Token + Email Verification |
-| التحقق الإضافي | رمز OTP عبر البريد الإلكتروني |
-| إدارة الحالة (Frontend) | Zustand |
-| التنسيق (Frontend) | Tailwind CSS + shadcn/ui |
-| لغة الواجهة | عربية وإنجليزية (i18n) |
-| اتجاه الواجهة | RTL للعربية / LTR للإنجليزية |
-| بيئة تشغيل التطوير | Node.js 20+ / Docker Compose |
+| إدارة الحالة | Zustand |
+| UI | Tailwind CSS + shadcn/ui |
+| المصادقة | JWT Access Token (15 دقيقة، في الذاكرة) + Refresh Token (7 أيام، HttpOnly Cookie، مخزن كـ Hash) |
+| التحقق | OTP عبر البريد الإلكتروني |
+| لغة الواجهة | عربية (RTL) رئيسية + إنجليزية (LTR) |
+| البيئة | Node.js 20+ / Docker Compose |
 
 ---
 
-## ثانياً: الهدف العام
+## ثانياً: الأدوار الأربعة
 
-أنشئ نظاماً كاملاً وآمناً لإدارة المستخدمين وتسجيل الدخول والصلاحيات، بحيث يسمح بوجود عدة أدوار داخل النظام، وكل دور يمتلك صلاحيات محددة بدقة. يجب أن يكون النظام:
+### 1. ADMIN — أنا المالك (مالك المنصة)
+- الحساب الوحيد من هذا النوع — لا يُنشأ أكثر من واحد.
+- يرى **جميع** البيانات عبر **جميع** المنشآت في لوحة تحكم واحدة.
+- ينشئ حسابات المديرين (Manager) لكل منشأة.
+- يدير الاشتراكات والفترات التجريبية.
+- لا يمكن حذفه أو تعديل صلاحياته من أي حساب آخر.
+- لا ينتمي لأي منشأة — يرى الكل.
+- لوحة Admin تعرض: إجمالي المنشآت + الإيرادات الكلية + المستخدمون + الاشتراكات + سجل التدقيق الكامل.
 
-- قابلاً للتوسع (Scalable)
-- منظماً ومقسماً إلى طبقات واضحة
-- آمناً في بيئة الإنتاج
-- سهل الصيانة والتطوير
-- مناسباً للاستخدام الحقيقي في منصة SaaS متعددة المستأجرين (Multi-Tenant)
+### 2. MANAGER — مدير المنشأة
+- يدير منشأته الخاصة فقط (فندق / شقق فندقية / منتجع...).
+- **ينشئ حسابات الموظفين** داخل منشأته.
+- **يحدد صلاحيات كل موظف** لكل وحدة بشكل منفصل (Toggle per module).
+- يضبط: إعدادات الضرائب + تطبيق الحجز المباشر + Night Audit + أوقات الدخول/الخروج.
+- لا يرى بيانات المنشآت الأخرى أبداً.
+- يُنشأ حسابه من Admin.
 
----
+### 3. EMPLOYEE — موظف المنشأة
+- **حسابه يُنشأ حصراً من قِبل Manager منشأته.**
+- صلاحياته تُحدَّد بدقة لكل وحدة (حجوزات، كاشير، تدبير منزلي...).
+- لا يستطيع تعديل صلاحياته أو صلاحيات زملائه.
+- يعمل فقط على المهام المسموحة صراحةً.
+- لا يرى بيانات Manager أو Admin.
+- يمكن تعطيل حسابه بواسطة Manager في أي وقت.
 
-## ثالثاً: الأدوار المطلوبة
-
-أنشئ نظام أدوار مرناً قابلاً للتعديل من قاعدة البيانات، ويتضمن افتراضياً الأدوار التالية:
-
-### 1. Admin (المدير العام)
-- يمتلك جميع الصلاحيات دون استثناء.
-- يستطيع إدارة النظام كاملاً: إنشاء الأدوار، حذف المستخدمين، تعديل الصلاحيات، ومراجعة سجلات النظام.
-- يستطيع تعديل أي مستخدم أو دور في النظام.
-- لا يمكن حذف حساب Admin الافتراضي.
-
-### 2. Manager (مدير المنشأة)
-- يستطيع إدارة حساب التسجيل لمنشأته الخاصة فقط.
-- يستطيع مراجعة وتعديل بيانات المستخدمين التابعين لمنشأته فحسب.
-- لا يستطيع تعديل صلاحياته بنفسه.
-- لا يستطيع الوصول إلى بيانات منشآت أخرى.
-
-### 3. Employee (الموظف)
-- يستطيع تنفيذ المهام التشغيلية المسموح بها من قِبَل Manager فقط.
-- لا يملك وصولاً إلى إعدادات النظام الحساسة.
-- لا يستطيع تعديل أي إعداد لحسابه إلا ما سُمح به صراحةً.
-
-### 4. User (المستخدم العادي)
-- يمتلك صلاحيات محدودة: عرض حسابه الشخصي فقط.
-- يستطيع إدارة حجوزاته وتعديل بياناته الشخصية.
-- يستطيع إرسال طلبات واستخدام الخدمات الأساسية للمنصة.
+### 4. GUEST — الضيف (النزيل / العميل)
+- مستخدم خارجي يحجز عبر **تطبيق الحجوزات المباشر** فقط.
+- يسجل دخوله برقم الجوال + OTP — لا كلمة مرور.
+- يستطيع: بحث + حجز + تتبع + إلغاء + تقييم.
+- لا يرى أي شاشة إدارية.
+- جلسته منفصلة تماماً: `{ type: 'guest' }` في الـ JWT.
+- يحمي مساراته `GuestGuard`.
 
 ---
 
-## رابعاً: الصلاحيات المطلوبة
+## ثالثاً: نظام الضرائب (مُحدَّث)
 
-أنشئ نظام صلاحيات منفصلاً عن الأدوار، قابلاً للإدارة من قاعدة البيانات، ولا يعتمد على قيم مكتوبة بشكل جامد (Hardcoded) داخل الكود.
+### أنواع الضرائب
 
-### قائمة الصلاحيات
+| الضريبة | المعدل | النوع | من يتحكم فيها |
+|---|---|---|---|
+| ضريبة القيمة المضافة (VAT) | 15% | إجبارية — ثابتة بالنظام السعودي | النظام تلقائياً |
+| رسوم السياحة | 2.5% (افتراضي) | **اختيارية** — يفعّلها/يعطّلها المدير | Manager من إعدادات المنشأة |
+
+### منطق حساب الأسعار
 
 ```
-users.create
-users.read
-users.update
-users.delete
-roles.create
-roles.read
-roles.update
-roles.delete
-permissions.assign
-dashboard.view
-reports.view
-reports.export
-settings.update
-profile.view
-profile.update
-audit_logs.view
-bookings.create
-bookings.read
-bookings.update
-bookings.delete
-establishments.create
-establishments.read
-establishments.update
-establishments.delete
+base_price          = سعر الغرفة × عدد الليالي
+discount_amount     = base_price × discount_rate  (إن وُجد خصم)
+price_net           = base_price - discount_amount
+
+tourism_tax_amount  = tourism_tax_enabled ? (price_net × tourism_tax_rate) : 0
+vat_base            = price_net + tourism_tax_amount
+vat_amount          = vat_base × 0.15
+total_amount        = vat_base + vat_amount
 ```
 
-### مصفوفة الصلاحيات لكل دور
+### تفصيل الفاتورة (يظهر في كل حجز وفاتورة ZATCA)
 
-| الصلاحية | Admin | Manager | Employee | User |
-|---|:---:|:---:|:---:|:---:|
-| users.create | ✅ | ✅ | ❌ | ❌ |
-| users.read | ✅ | ✅ (منشأته فقط) | ❌ | ❌ |
-| users.update | ✅ | ✅ (منشأته فقط) | ❌ | ❌ |
-| users.delete | ✅ | ❌ | ❌ | ❌ |
-| roles.create | ✅ | ❌ | ❌ | ❌ |
-| roles.read | ✅ | ✅ | ❌ | ❌ |
-| roles.update | ✅ | ❌ | ❌ | ❌ |
-| roles.delete | ✅ | ❌ | ❌ | ❌ |
-| permissions.assign | ✅ | ❌ | ❌ | ❌ |
-| dashboard.view | ✅ | ✅ | ✅ | ❌ |
-| reports.view | ✅ | ✅ | ❌ | ❌ |
-| reports.export | ✅ | ✅ | ❌ | ❌ |
-| settings.update | ✅ | ✅ (منشأته فقط) | ❌ | ❌ |
-| profile.view | ✅ | ✅ | ✅ | ✅ |
-| profile.update | ✅ | ✅ | ✅ | ✅ |
-| audit_logs.view | ✅ | ❌ | ❌ | ❌ |
-| bookings.create | ✅ | ✅ | ✅ | ✅ |
-| bookings.read | ✅ | ✅ | ✅ | ✅ (حجوزاته فقط) |
-| bookings.update | ✅ | ✅ | ✅ | ✅ (حجوزاته فقط) |
-| bookings.delete | ✅ | ✅ | ❌ | ❌ |
-| establishments.create | ✅ | ❌ | ❌ | ❌ |
-| establishments.read | ✅ | ✅ (منشأته فقط) | ✅ (منشأته فقط) | ❌ |
-| establishments.update | ✅ | ✅ (منشأته فقط) | ❌ | ❌ |
-| establishments.delete | ✅ | ❌ | ❌ | ❌ |
+```
+سعر الغرفة (قبل الخصم):     X ر.س
+الخصم (-X%):                - X ر.س   [يظهر فقط إن وُجد خصم]
+السعر الصافي:                X ر.س
+رسوم السياحة (2.5%):         X ر.س    [يظهر فقط إن كانت مفعّلة]
+المجموع قبل الضريبة:          X ر.س
+ضريبة القيمة المضافة (15%):  X ر.س
+الإجمالي:                    X ر.س
+```
 
-> **ملاحظة:** هذه المصفوفة قابلة للتعديل الكامل من لوحة التحكم دون تعديل الكود.
+### إعدادات الضرائب (Manager — منشأته فقط)
 
----
+| الإعداد | النوع | الافتراضي | القيود |
+|---|---|---|---|
+| `tourism_tax_enabled` | BOOLEAN | false | Toggle — يفعّله Manager |
+| `tourism_tax_rate` | DECIMAL | 0.0250 (2.5%) | قابل للتعديل: 0% – 10% |
+| `vat_rate` | DECIMAL | 0.1500 (15%) | **ثابت** — غير قابل للتعديل |
+| `vat_number` | VARCHAR | — | رقم التسجيل الضريبي في ZATCA |
 
-## خامساً: مكونات النظام الأساسية
+### صلاحيات الضرائب الجديدة
 
-### 1. صفحة تسجيل الدخول
-- حقل: البريد الإلكتروني أو اسم المستخدم
-- حقل: كلمة المرور (مع زر إظهار/إخفاء)
-- خيار: تذكرني (Remember Me)
-- رابط: نسيت كلمة المرور؟
-- رسائل خطأ عامة وآمنة (لا تكشف سبب الفشل بدقة)
-- حماية CSRF
-- Rate Limiting على مستوى IP
+```
+tax_settings.view    → Admin + Manager
+tax_settings.update  → Admin (الكل) + Manager (منشأته فقط)
+```
 
-### 2. صفحة إنشاء حساب
-- حقل: الاسم الكامل
-- حقل: البريد الإلكتروني
-- حقل: رقم الهاتف (بصيغة دولية)
-- حقل: اسم المنشأة
-- حقل: كلمة المرور
-- حقل: تأكيد كلمة المرور
-- خانة: الموافقة على الشروط والأحكام
-- التحقق الفوري من صحة البيانات (Real-time Validation)
-- إرسال بريد تحقق فور التسجيل
+### API الضرائب
 
-### 3. نظام التحقق من الهوية
-- إرسال رمز OTP إلى البريد الإلكتروني فور التسجيل
-- مدة صلاحية رمز التحقق: 15 دقيقة
-- منع وصول الحسابات غير المُفعَّلة إلى أي مسار محمي
-- صفحة مخصصة لإدخال رمز التحقق
-- إمكانية إعادة إرسال الرمز مع تأخير زمني (Cooldown: 60 ثانية)
-
-### 4. استعادة كلمة المرور
-- إدخال البريد الإلكتروني المسجَّل
-- إرسال رابط إعادة التعيين عبر البريد (صالح لمدة 30 دقيقة)
-- الرابط يُستخدَم مرة واحدة فقط (Single-Use Token)
-- بعد التعيين: إلغاء جميع جلسات المستخدم الحالية
-- منع تكرار كلمة المرور الأخيرة
-
-### 5. إدارة الجلسات
-- JWT: Access Token (مدة: 15 دقيقة) + Refresh Token (مدة: 7 أيام)
-- تخزين Refresh Token في قاعدة البيانات مع دعم الإلغاء
-- تخزين Access Token في الذاكرة (In-Memory) في الـ Client
-- تخزين Refresh Token في HttpOnly Cookie
-- دعم تسجيل الخروج الكامل من جميع الأجهزة
-
-### 6. لوحة إدارة المستخدمين
-- جدول بيانات مع بحث وتصفية وفرز
-- إضافة مستخدم جديد
-- تعديل بيانات المستخدم
-- تعيين/تغيير دور المستخدم
-- تعطيل الحساب مؤقتاً
-- الحذف الناعم (Soft Delete) مع إمكانية الاسترجاع
-- عرض حالة الحساب: نشط / غير مُفعَّل / معطَّل / محذوف
-
-### 7. لوحة إدارة الأدوار
-- إنشاء دور جديد بالاسم والوصف
-- ربط مجموعة صلاحيات بكل دور
-- تعديل صلاحيات الدور في الوقت الفعلي
-- منع حذف الأدوار الأساسية (Admin, Manager, Employee, User)
-- عرض عدد المستخدمين المرتبطين بكل دور
-
-### 8. لوحة إدارة الصلاحيات
-- عرض الصلاحيات مصنَّفةً حسب الوحدات (Users, Roles, Bookings, إلخ)
-- ربط الصلاحيات بالأدوار عبر واجهة بصرية (Drag & Drop أو Checkboxes)
-- منع إزالة صلاحية حرجة من Admin
-
-### 9. حماية المسارات
-- `AuthGuard`: التحقق من وجود Access Token صالح
-- `RolesGuard`: التحقق من دور المستخدم
-- `PermissionsGuard`: التحقق من الصلاحية الفعلية المطلوبة
-- `OwnershipGuard`: التحقق من أن المورد يعود للمستخدم نفسه أو لمنشأته
-- تطبيق Guards بشكل تراكمي (Composable)
-
-### 10. سجل التدقيق (Audit Log)
-تسجيل العمليات التالية تلقائياً:
-- تسجيل الدخول الناجح وفشله
-- تسجيل الخروج
-- إنشاء حساب جديد
-- تغيير كلمة المرور
-- تعديل الصلاحيات
-- حذف مستخدم
-- تغيير إعدادات النظام
-- تعيين دور لمستخدم
-- تفعيل/تعطيل حساب
+| المسار | الطريقة | الوظيفة | الصلاحية |
+|---|---|---|---|
+| `/settings/tax` | GET | عرض إعدادات الضرائب | `tax_settings.view` |
+| `/settings/tax` | PATCH | تحديث إعدادات (تفعيل/تعطيل السياحة) | `tax_settings.update` |
+| `/bookings/:id/tax-breakdown` | GET | تفصيل الضرائب لحجز محدد | `bookings.read` |
 
 ---
 
-## سادساً: قاعدة البيانات
-
-### تصميم الجداول (PostgreSQL + Prisma)
-
----
+## رابعاً: قاعدة البيانات (PostgreSQL + Prisma)
 
 ### جدول `users`
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| id | UUID | ✅ | PK | معرف المستخدم | DEFAULT gen_random_uuid() |
-| name | VARCHAR(100) | ✅ | — | الاسم الكامل | NOT NULL |
-| email | VARCHAR(255) | ✅ | UNIQUE INDEX | البريد الإلكتروني | NOT NULL, UNIQUE |
-| phone | VARCHAR(20) | ❌ | — | رقم الهاتف | — |
-| username | VARCHAR(50) | ❌ | UNIQUE INDEX | اسم المستخدم | UNIQUE |
-| password_hash | VARCHAR(255) | ✅ | — | كلمة المرور المشفرة | NOT NULL |
-| establishment_id | UUID | ❌ | FK → establishments | ارتباط بالمنشأة | ON DELETE SET NULL |
-| is_email_verified | BOOLEAN | ✅ | — | هل البريد مُفعَّل؟ | DEFAULT false |
-| is_active | BOOLEAN | ✅ | — | هل الحساب نشط؟ | DEFAULT true |
-| is_deleted | BOOLEAN | ✅ | — | حذف ناعم | DEFAULT false |
-| deleted_at | TIMESTAMP | ❌ | — | تاريخ الحذف الناعم | NULL |
-| last_login_at | TIMESTAMP | ❌ | — | آخر تسجيل دخول | — |
-| failed_login_count | INT | ✅ | — | عدد محاولات الدخول الفاشلة | DEFAULT 0 |
-| locked_until | TIMESTAMP | ❌ | — | مدة قفل الحساب | NULL |
-| subscription_type | ENUM | ✅ | — | نوع الاشتراك | trial / basic / pro / enterprise |
-| trial_ends_at | TIMESTAMP | ❌ | — | تاريخ انتهاء التجربة المجانية | — |
-| subscription_ends_at | TIMESTAMP | ❌ | — | تاريخ انتهاء الاشتراك | — |
-| created_at | TIMESTAMP | ✅ | — | تاريخ الإنشاء | DEFAULT NOW() |
-| updated_at | TIMESTAMP | ✅ | — | تاريخ آخر تعديل | AUTO UPDATE |
-
----
+| الحقل | النوع | الغرض |
+|---|---|---|
+| id | UUID PK | معرف المستخدم |
+| name | VARCHAR(100) | الاسم الكامل |
+| email | VARCHAR UNIQUE | البريد الإلكتروني |
+| phone | VARCHAR? | رقم الجوال |
+| password_hash | VARCHAR | bcrypt rounds=12 |
+| country | VARCHAR? | رمز الدولة ISO |
+| city | VARCHAR? | المدينة |
+| establishment_id | FK → establishments? | null للـ Admin |
+| role_type | ENUM | ADMIN / MANAGER / EMPLOYEE |
+| is_email_verified | BOOLEAN DEFAULT false | هل البريد مفعّل؟ |
+| is_active | BOOLEAN DEFAULT true | حالة الحساب |
+| is_deleted | BOOLEAN DEFAULT false | Soft Delete |
+| deleted_at | TIMESTAMP? | تاريخ الحذف الناعم |
+| failed_login_count | INT DEFAULT 0 | محاولات الدخول الفاشلة |
+| locked_until | TIMESTAMP? | وقت إلغاء القفل |
+| last_login_at | TIMESTAMP? | آخر دخول |
+| created_at | TIMESTAMP DEFAULT NOW() | — |
+| updated_at | TIMESTAMP AUTO | — |
 
 ### جدول `establishments`
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| id | UUID | ✅ | PK | معرف المنشأة | DEFAULT gen_random_uuid() |
-| name | VARCHAR(200) | ✅ | — | اسم المنشأة | NOT NULL |
-| owner_id | UUID | ✅ | FK → users | مالك المنشأة | NOT NULL |
-| is_active | BOOLEAN | ✅ | — | حالة المنشأة | DEFAULT true |
-| created_at | TIMESTAMP | ✅ | — | تاريخ الإنشاء | DEFAULT NOW() |
-| updated_at | TIMESTAMP | ✅ | — | تاريخ آخر تعديل | AUTO UPDATE |
+| الحقل | النوع | الغرض |
+|---|---|---|
+| id | UUID PK | معرف المنشأة |
+| serial_number | INT UNIQUE AUTO | رقم تسلسلي: 1، 2، 3... (للتجديد) |
+| name | VARCHAR(200) | اسم المنشأة |
+| slug | VARCHAR UNIQUE | للرابط: dheuof.com/book/{slug} |
+| type | ENUM | HOTEL / APARTMENT / RESORT / CHALET |
+| owner_id | FK → users | Manager المسؤول |
+| country | VARCHAR DEFAULT 'SA' | رمز الدولة |
+| city | VARCHAR? | المدينة |
+| district | VARCHAR? | الحي |
+| phone | VARCHAR? | هاتف المنشأة |
+| subscription_status | ENUM | TRIAL / ACTIVE / EXPIRED / SUSPENDED |
+| trial_ends_at | TIMESTAMP | تاريخ انتهاء التجربة (60 يوم من التسجيل) |
+| subscription_ends_at | TIMESTAMP? | تاريخ انتهاء الاشتراك |
+| is_active | BOOLEAN DEFAULT true | — |
+| is_deleted | BOOLEAN DEFAULT false | Soft Delete |
+| created_at | TIMESTAMP DEFAULT NOW() | — |
+
+### جدول `tax_settings` (جديد)
+
+| الحقل | النوع | الغرض |
+|---|---|---|
+| id | UUID PK | — |
+| establishment_id | FK → establishments UNIQUE | منشأة واحدة = سجل ضرائب واحد |
+| vat_rate | DECIMAL(5,4) DEFAULT 0.1500 | ضريبة القيمة المضافة (ثابتة 15%) |
+| vat_number | VARCHAR? | رقم التسجيل الضريبي في ZATCA |
+| tourism_tax_enabled | BOOLEAN DEFAULT false | تفعيل رسوم السياحة |
+| tourism_tax_rate | DECIMAL(5,4) DEFAULT 0.0250 | معدل رسوم السياحة (2.5% افتراضي) |
+| updated_by | FK → users? | آخر من عدّل الإعدادات |
+| updated_at | TIMESTAMP AUTO | — |
+
+### جدول `roles` و `permissions`
+
+| الحقل | النوع | الغرض |
+|---|---|---|
+| roles.id / name / is_system | UUID / VARCHAR / BOOL | is_system يمنع الحذف |
+| permissions.id / name / module | UUID / VARCHAR / VARCHAR | الصلاحيات مصنّفة بالوحدة |
+| role_permissions | role_id + permission_id PK | ربط الأدوار بالصلاحيات |
+| user_roles | user_id + role_id PK | ربط المستخدمين بالأدوار |
+| user_permissions | user_id + permission_id | صلاحيات مخصصة إضافية |
+
+### جدول `refresh_tokens` و Security Tokens
+
+| الجدول | الحقول الرئيسية | الغرض |
+|---|---|---|
+| refresh_tokens | token_hash UNIQUE + expires_at + is_revoked | Refresh Token كـ Hash — لا نص صريح |
+| password_reset_tokens | token_hash + is_used + expires_at | Single-Use — 30 دقيقة |
+| email_verification_tokens | otp_hash + expires_at + is_used | OTP — 15 دقيقة |
+| login_attempts | email + ip_address + is_success + attempted_at | تتبع محاولات الدخول |
+| audit_logs | user_id + action + entity_type + old_value + new_value | سجل كل العمليات |
+
+### جدول `room_types` و `rooms`
+
+| الحقل | النوع | الغرض |
+|---|---|---|
+| room_types.id | UUID PK | معرف النوع |
+| room_types.name | VARCHAR | اسم النوع (غرفة عادية، جناح...) |
+| room_types.base_price | DECIMAL | السعر الأساسي للليلة |
+| room_types.max_occupancy | INT | الحد الأقصى للأشخاص |
+| room_types.amenities | VARCHAR[] | المرافق |
+| rooms.id | UUID PK | معرف الغرفة |
+| rooms.room_number | VARCHAR | رقم الغرفة |
+| rooms.floor | INT? | الطابق |
+| rooms.status | ENUM | AVAILABLE / OCCUPIED / DIRTY / MAINTENANCE / OUT_OF_ORDER |
+
+### جدول `guests`
+
+| الحقل | النوع | الغرض |
+|---|---|---|
+| id | UUID PK | معرف الضيف |
+| establishment_id | FK | المنشأة |
+| full_name | VARCHAR | الاسم الكامل |
+| phone | VARCHAR UNIQUE per establishment | رقم الجوال (تسجيل الدخول) |
+| email | VARCHAR? | البريد |
+| country | VARCHAR? | الدولة |
+| city | VARCHAR? | المدينة |
+| id_number | VARCHAR? | رقم الهوية / الجواز |
+| vip_level | ENUM DEFAULT NONE | NONE / SILVER / GOLD / PLATINUM |
+| is_blacklisted | BOOLEAN DEFAULT false | قائمة الحظر |
+| total_stays | INT DEFAULT 0 | عدد الإقامات |
+| total_spent | DECIMAL DEFAULT 0 | إجمالي الإنفاق |
+| created_at | TIMESTAMP | — |
+
+### جدول `direct_bookings` (مع الضرائب)
+
+| الحقل | النوع | الغرض |
+|---|---|---|
+| id | UUID PK | — |
+| booking_ref | VARCHAR UNIQUE | DB-2025-XXXXX |
+| establishment_id | FK | المنشأة |
+| room_type_id | FK → room_types | نوع الغرفة |
+| room_id | FK → rooms? | الغرفة الفعلية (عند الوصول) |
+| guest_id | FK → guests? | ملف الضيف |
+| guest_name | VARCHAR | اسم الضيف |
+| guest_phone | VARCHAR | الجوال |
+| guest_email | VARCHAR? | البريد |
+| guest_country | VARCHAR? | الدولة |
+| guest_city | VARCHAR? | المدينة |
+| check_in_date | TIMESTAMP | تاريخ الدخول |
+| check_out_date | TIMESTAMP | تاريخ الخروج |
+| nights | INT | عدد الليالي |
+| adults | INT | البالغون |
+| children | INT DEFAULT 0 | الأطفال |
+| base_price | DECIMAL | السعر الأساسي (قبل الخصم) |
+| discount_type | ENUM? | DIRECT / EARLY_BIRD / LONG_STAY / PROMO |
+| discount_pct | DECIMAL DEFAULT 0 | نسبة الخصم |
+| discount_amount | DECIMAL DEFAULT 0 | مبلغ الخصم |
+| price_net | DECIMAL | السعر الصافي (بعد الخصم) |
+| **tourism_tax_enabled** | BOOLEAN | هل رسوم السياحة مفعّلة لهذا الحجز؟ |
+| **tourism_tax_rate** | DECIMAL DEFAULT 0 | المعدل المطبَّق وقت الحجز |
+| **tourism_tax_amount** | DECIMAL DEFAULT 0 | مبلغ رسوم السياحة |
+| **vat_rate** | DECIMAL DEFAULT 0.15 | معدل VAT المطبَّق وقت الحجز |
+| **vat_amount** | DECIMAL | مبلغ ضريبة القيمة المضافة |
+| **total_amount** | DECIMAL | الإجمالي الكلي شاملاً جميع الضرائب |
+| status | ENUM | PENDING / CONFIRMED / CHECKED_IN / CHECKED_OUT / CANCELLED / NO_SHOW |
+| payment_status | ENUM | UNPAID / PARTIAL / PAID / REFUNDED |
+| paid_amount | DECIMAL DEFAULT 0 | المبلغ المدفوع |
+| payment_method | ENUM? | MADA / VISA / APPLE_PAY / CASH |
+| promo_code | VARCHAR? | كود الخصم المستخدم |
+| source | ENUM DEFAULT DIRECT | DIRECT / OTA_BOOKING / OTA_EXPEDIA / OTA_AIRBNB |
+| special_requests | TEXT? | طلبات خاصة |
+| created_at | TIMESTAMP | — |
+
+### جداول PMS الإضافية
+
+| الجدول | الحقول الأساسية | الغرض |
+|---|---|---|
+| booking_reviews | booking_id + overall + cleanliness + service + location + value (1-5) | تقييمات بعد الخروج |
+| night_audit_settings | establishment_id + scheduled_time + default_check_in_time + default_check_out_time + require_payment_before_close | إعدادات Night Audit |
+| night_audit_logs | establishment_id + audit_date + status + total_revenue + total_vat + total_tourism_tax + unsettled_count | سجل الإغلاق اليومي |
+| payment_devices | establishment_id + device_name + device_type (POS/MADA/CASH_DRAWER) + is_active | أجهزة الدفع |
+| payments | booking_id + device_id? + method + amount + status + settled_in_audit_id | المدفوعات |
+| zatca_invoices | booking_id + invoice_number + invoice_type (SIMPLIFIED/CREDIT) + xml_signed + qr_tlv_base64 + qr_image_base64 + zatca_status + vat_amount + tourism_tax_amount | فواتير ZATCA |
+| housekeeping_tasks | room_id + assigned_to + task_type + priority + status + due_at | مهام التدبير المنزلي |
+| booking_app_settings | establishment_id + direct_discount + early_bird_discount + long_stay_discount + min_nights_long_stay + cancellation_policy + accepted_payments[] | إعدادات تطبيق الحجز |
+| promotions | establishment_id + code UNIQUE + discount_type + discount_value + valid_from + valid_until + max_uses + used_count | كودات الخصم |
+| subscriptions | establishment_id + serial_number + plan + starts_at + ends_at + amount_paid | سجل الاشتراكات |
 
 ---
 
-### جدول `roles`
+## خامساً: قائمة الصلاحيات الكاملة (مخزنة في DB)
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| id | UUID | ✅ | PK | معرف الدور | DEFAULT gen_random_uuid() |
-| name | VARCHAR(50) | ✅ | UNIQUE | اسم الدور | NOT NULL, UNIQUE |
-| description | TEXT | ❌ | — | وصف الدور | — |
-| is_system | BOOLEAN | ✅ | — | هل هو دور نظام محمي؟ | DEFAULT false |
-| created_at | TIMESTAMP | ✅ | — | تاريخ الإنشاء | DEFAULT NOW() |
+```
+# المستخدمون
+users.create / users.read / users.update / users.delete / users.activate
 
----
+# الأدوار والصلاحيات
+roles.create / roles.read / roles.update / roles.delete
+permissions.assign
 
-### جدول `permissions`
+# اللوحة والتقارير
+dashboard.view / dashboard.analytics
+reports.view / reports.export
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| id | UUID | ✅ | PK | معرف الصلاحية | DEFAULT gen_random_uuid() |
-| name | VARCHAR(100) | ✅ | UNIQUE | اسم الصلاحية (users.create) | NOT NULL, UNIQUE |
-| module | VARCHAR(50) | ✅ | INDEX | الوحدة التابعة لها (users) | NOT NULL |
-| description | TEXT | ❌ | — | وصف الصلاحية | — |
-| created_at | TIMESTAMP | ✅ | — | تاريخ الإنشاء | DEFAULT NOW() |
+# الإعدادات والضرائب
+settings.view / settings.update
+tax_settings.view / tax_settings.update
 
----
+# الملف الشخصي
+profile.view / profile.update
 
-### جدول `role_permissions`
+# سجل التدقيق
+audit_logs.view / audit_logs.export
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| role_id | UUID | ✅ | FK → roles | ارتباط بالدور | ON DELETE CASCADE |
-| permission_id | UUID | ✅ | FK → permissions | ارتباط بالصلاحية | ON DELETE CASCADE |
-| — | — | — | PK (role_id, permission_id) | مفتاح مركب | UNIQUE |
+# الغرف
+rooms.create / rooms.read / rooms.update / rooms.delete / rooms.change_status
 
----
+# الضيوف
+guests.create / guests.read / guests.update / guests.blacklist / guests.vip_upgrade
 
-### جدول `user_roles`
+# الحجوزات
+bookings.create / bookings.read / bookings.update / bookings.delete
+bookings.check_in / bookings.check_out / bookings.cancel
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| user_id | UUID | ✅ | FK → users | ارتباط بالمستخدم | ON DELETE CASCADE |
-| role_id | UUID | ✅ | FK → roles | ارتباط بالدور | ON DELETE CASCADE |
-| assigned_by | UUID | ❌ | FK → users | من قام بالتعيين | — |
-| assigned_at | TIMESTAMP | ✅ | — | تاريخ التعيين | DEFAULT NOW() |
-| — | — | — | PK (user_id, role_id) | مفتاح مركب | UNIQUE |
+# Night Audit
+night_audit.view / night_audit.run / night_audit.settings
 
----
+# الفواتير (ZATCA)
+invoices.create / invoices.view / invoices.export
 
-### جدول `user_permissions` (صلاحيات مخصصة اختيارية)
+# التدبير المنزلي
+housekeeping.view / housekeeping.create / housekeeping.assign / housekeeping.complete
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| user_id | UUID | ✅ | FK → users | ارتباط بالمستخدم | ON DELETE CASCADE |
-| permission_id | UUID | ✅ | FK → permissions | صلاحية مباشرة | ON DELETE CASCADE |
-| granted_by | UUID | ✅ | FK → users | من منح الصلاحية | NOT NULL |
-| granted_at | TIMESTAMP | ✅ | — | تاريخ المنح | DEFAULT NOW() |
+# تطبيق الحجز المباشر
+booking_app.view / booking_app.settings / booking_app.promotions
 
----
+# التقييمات
+reviews.view / reviews.reply
 
-### جدول `password_reset_tokens`
+# أجهزة الدفع
+payment_devices.manage
+```
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| id | UUID | ✅ | PK | معرف الرمز | DEFAULT gen_random_uuid() |
-| user_id | UUID | ✅ | FK → users | ارتباط بالمستخدم | ON DELETE CASCADE |
-| token_hash | VARCHAR(255) | ✅ | INDEX | هاش الرمز | NOT NULL |
-| expires_at | TIMESTAMP | ✅ | — | تاريخ انتهاء الصلاحية | NOT NULL |
-| is_used | BOOLEAN | ✅ | — | هل استُخدم؟ | DEFAULT false |
-| created_at | TIMESTAMP | ✅ | — | تاريخ الإنشاء | DEFAULT NOW() |
+### مصفوفة الصلاحيات الرئيسية
 
----
-
-### جدول `email_verification_tokens`
-
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| id | UUID | ✅ | PK | معرف رمز التحقق | DEFAULT gen_random_uuid() |
-| user_id | UUID | ✅ | FK → users | ارتباط بالمستخدم | ON DELETE CASCADE |
-| otp_hash | VARCHAR(255) | ✅ | — | هاش رمز OTP | NOT NULL |
-| expires_at | TIMESTAMP | ✅ | — | تاريخ انتهاء الصلاحية | NOT NULL |
-| is_used | BOOLEAN | ✅ | — | هل استُخدم؟ | DEFAULT false |
-| created_at | TIMESTAMP | ✅ | — | تاريخ الإنشاء | DEFAULT NOW() |
+| الصلاحية | Admin | Manager | Employee | Guest |
+|---|:---:|:---:|:---:|:---:|
+| users.create/read/update/delete | ✅ | ✅ منشأته | ❌ | ❌ |
+| permissions.assign | ✅ | ✅ لموظفيه | ❌ | ❌ |
+| dashboard.view | ✅ | ✅ | ✅ محدود | ❌ |
+| reports.view/export | ✅ | ✅ | ❌ | ❌ |
+| **tax_settings.view** | ✅ | ✅ | ❌ | ❌ |
+| **tax_settings.update** | ✅ | ✅ منشأته | ❌ | ❌ |
+| settings.update | ✅ | ✅ منشأته | ❌ | ❌ |
+| rooms.create/update/delete | ✅ | ✅ | ❌ | ❌ |
+| rooms.read | ✅ | ✅ | ✅ | ❌ |
+| guests.create/read | ✅ | ✅ | حسب الإعداد | ❌ |
+| guests.blacklist/vip_upgrade | ✅ | ✅ | ❌ | ❌ |
+| bookings.create/read/update | ✅ | ✅ | حسب الإعداد | ❌ |
+| bookings.check_in/check_out | ✅ | ✅ | حسب الإعداد | ❌ |
+| night_audit.run/settings | ✅ | ✅ | ❌ | ❌ |
+| invoices.create/view/export | ✅ | ✅ | view فقط | ❌ |
+| housekeeping.* | ✅ | ✅ | ✅ | ❌ |
+| booking_app.settings/promotions | ✅ | ✅ | ❌ | ❌ |
+| payment_devices.manage | ✅ | ✅ | ❌ | ❌ |
+| audit_logs.view/export | ✅ | ✅ | ❌ | ❌ |
+| profile.view/update | ✅ | ✅ | ✅ | ✅ |
 
 ---
 
-### جدول `refresh_tokens`
+## سادساً: وحدات النظام PMS
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| id | UUID | ✅ | PK | معرف الـ Token | DEFAULT gen_random_uuid() |
-| user_id | UUID | ✅ | FK → users | ارتباط بالمستخدم | ON DELETE CASCADE |
-| token_hash | VARCHAR(255) | ✅ | UNIQUE INDEX | هاش الـ Refresh Token | NOT NULL, UNIQUE |
-| device_info | TEXT | ❌ | — | معلومات الجهاز | — |
-| ip_address | INET | ❌ | — | عنوان IP | — |
-| expires_at | TIMESTAMP | ✅ | — | تاريخ انتهاء الصلاحية | NOT NULL |
-| is_revoked | BOOLEAN | ✅ | — | هل أُلغي؟ | DEFAULT false |
-| created_at | TIMESTAMP | ✅ | — | تاريخ الإنشاء | DEFAULT NOW() |
+### 1. تطبيق الحجز المباشر (Direct Booking App)
 
----
+رابط عام للعملاء: `dheuof.com/book/{establishment_slug}`
 
-### جدول `login_attempts`
+**الخصائص:**
+- بحث عن غرف بالتاريخ وعدد الأشخاص
+- حساب السعر تلقائياً مع تطبيق **جميع الضرائب**:
+  - VAT 15% إجباري
+  - رسوم السياحة 2.5% إن فعّلها Manager
+- خصومات تلقائية (تُطبَّق على السعر الصافي قبل الضرائب):
+  - **خصم الحجز المباشر** (افتراضي 5%) — لتجاوز عمولات OTA 15-25%
+  - **خصم الحجز المبكر** (افتراضي 10% عند الحجز قبل 30 يوم)
+  - **خصم الإقامة الطويلة** (افتراضي 15% من 7 ليالٍ)
+  - **كودات خصم مخصصة** من Manager
+- تسلسل عرض الأسعار لعميل الحجز:
+  ```
+  سعر الغرفة الأصلي: X ر.س
+  الخصم: - X ر.س
+  السعر الصافي: X ر.س
+  رسوم السياحة: + X ر.س  [إن وُجدت]
+  VAT 15%: + X ر.س
+  الإجمالي: X ر.س
+  ```
+- الدفع: Moyasar (MADA + Visa + Apple Pay)
+- تأكيد الحجز: QR Code + SMS + Email
+- تتبع الحجز برقم الجوال — بدون تسجيل دخول
+- إلغاء مع احتساب الاسترداد حسب سياسة المنشأة
+- تقييم بعد الخروج (5 معايير × 5 نجوم)
+- عرض توفير العميل مقارنةً بـ OTA
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| id | UUID | ✅ | PK | معرف المحاولة | DEFAULT gen_random_uuid() |
-| email | VARCHAR(255) | ✅ | INDEX | البريد المُستخدم | NOT NULL |
-| ip_address | INET | ✅ | INDEX | عنوان IP | NOT NULL |
-| is_success | BOOLEAN | ✅ | — | هل نجحت المحاولة؟ | NOT NULL |
-| user_agent | TEXT | ❌ | — | بيانات المتصفح | — |
-| attempted_at | TIMESTAMP | ✅ | INDEX | وقت المحاولة | DEFAULT NOW() |
+**إعدادات Manager لتطبيق الحجز:**
+- تفعيل/تعطيل رسوم السياحة
+- معدل رسوم السياحة (0–10%)
+- نسب الخصومات الثلاثة
+- سياسة الإلغاء
+- الحد الأدنى للإقامة
+- طرق الدفع المقبولة
 
----
+### 2. Night Audit
 
-### جدول `audit_logs`
+**الخصائص:**
+- وقت التشغيل اختياري — Manager يضبطه (افتراضي 23:59)
+- Cron ديناميكي: يُعاد ضبطه تلقائياً عند تغيير الوقت
+- تشغيل يدوي متاح لـ Manager
+- **شرط التشغيل:** لا يعمل إذا كانت هناك مدفوعات معلّقة
+- تحديث حالة الحجوزات: DUE_OUT → No-Show أو تمديد
+- تثبيت الإيرادات (تشمل: السعر الصافي + رسوم السياحة + VAT) ومنع تعديلها
+- توليد تقرير PDF يشمل:
+  - إجمالي الإيرادات
+  - إجمالي VAT المحصّل
+  - **إجمالي رسوم السياحة المحصّلة** (إن كانت مفعّلة)
+  - تفصيل أجهزة الدفع
+- ربط أجهزة الدفع: POS + MADA + Visa + CASH_DRAWER
+- تعديل وقت الدخول/الخروج الافتراضي: **Manager فقط**
 
-| اسم الحقل | النوع | إجباري | مفتاح | الغرض | القيود |
-|---|---|:---:|---|---|---|
-| id | UUID | ✅ | PK | معرف السجل | DEFAULT gen_random_uuid() |
-| user_id | UUID | ❌ | FK → users | المستخدم المنفِّذ | ON DELETE SET NULL |
-| action | VARCHAR(100) | ✅ | INDEX | نوع العملية | NOT NULL |
-| entity_type | VARCHAR(50) | ❌ | INDEX | نوع الكيان (user/role/...) | — |
-| entity_id | UUID | ❌ | — | معرف الكيان المتأثر | — |
-| old_value | JSONB | ❌ | — | القيمة قبل التعديل | — |
-| new_value | JSONB | ❌ | — | القيمة بعد التعديل | — |
-| ip_address | INET | ❌ | — | عنوان IP | — |
-| user_agent | TEXT | ❌ | — | بيانات المتصفح | — |
-| created_at | TIMESTAMP | ✅ | INDEX | وقت تنفيذ العملية | DEFAULT NOW() |
+### 3. ZATCA — الفاتورة الإلكترونية (مُحدَّثة بالضرائب)
+
+**الخصائص:**
+- إصدار فاتورة مبسّطة تلقائياً عند Check-out
+- **بنود الفاتورة تشمل:**
+  - السعر الصافي للغرفة
+  - رسوم السياحة (سطر منفصل إن كانت مفعّلة)
+  - مبلغ VAT (15% على القاعدة الضريبية = صافي + سياحة)
+  - الإجمالي الكلي
+- QR Code بمعيار TLV الرسمي من ZATCA (5 حقول مشفّرة Base64):
+  1. اسم البائع
+  2. رقم التسجيل الضريبي
+  3. تاريخ ووقت الفاتورة
+  4. إجمالي الفاتورة (شامل كل الضرائب)
+  5. مبلغ VAT
+- QR قابل للقراءة بأي جهاز + التحقق منه
+- XML موقّع وفق UBL 2.1
+- إرسال للـ ZATCA API (Sandbox → Production)
+- صفحة Scanner بالكاميرا للتحقق من QR
+- فاتورة دائن (Credit Note) عند الاسترداد
+
+### 4. التقارير و KPI
+
+**المؤشرات الحية (Real-time):**
+- معدل الإشغال (Occupancy Rate)
+- متوسط سعر الغرفة (ADR)
+- الإيراد لكل غرفة متاحة (RevPAR)
+- إجمالي الإيرادات اليومية
+- **إجمالي VAT المحصّل يومياً**
+- **إجمالي رسوم السياحة المحصّلة يومياً**
+
+**التقارير:**
+- تقرير الإشغال: يومي / أسبوعي / شهري
+- تقرير الإيرادات: حسب المصدر + نوع الغرفة + طريقة الدفع
+- **تقرير الضرائب:** VAT المحصّل + رسوم السياحة المحصّلة + الإجمالي لأي فترة
+- تقرير الضيوف: توزيع الدول والمناطق (Shamoos)
+- تقرير التقييمات: Radar Chart لـ 5 معايير
+- توقعات الإشغال: 7 / 14 / 30 يوم
+- تقرير الوفر من العمولات vs OTA
+- تصدير كل تقرير: PDF أو Excel
+
+### 5. Housekeeping (التدبير المنزلي)
+
+- مهمة تنظيف تُنشأ تلقائياً عند كل Check-out
+- حالة الغرفة تتغير: DIRTY → CLEAN
+- لوحة Kanban: PENDING → IN_PROGRESS → DONE
+- أنواع المهام: CLEANING / INSPECTION / MAINTENANCE / TURNDOWN
+- أولوية: LOW / MEDIUM / HIGH / URGENT
+- تعيين المهمة لموظف محدد
+
+### 6. Channel Manager
+
+- مزامنة التوفر مع: Booking.com + Airbnb + Expedia + Agoda
+- تحديث التوفر تلقائياً عند كل حجز أو إلغاء
+- استقبال حجوزات OTA عبر Webhook
+- سجل نجاح/فشل كل عملية مزامنة
+- Retry Queue للعمليات الفاشلة
 
 ---
 
 ## سابعاً: متطلبات الأمان
 
-طبّق جميع الممارسات التالية دون استثناء:
-
-### تشفير كلمات المرور
-- استخدم `bcrypt` بـ salt rounds = 12 كحد أدنى أو `argon2id`.
-- لا تخزن أي كلمة مرور كنص صريح في أي مكان.
-- لا تُرسل كلمة المرور الحالية عند تعديل الملف الشخصي.
-
-### حماية تسجيل الدخول
-- Rate Limiting: 5 محاولات لكل IP في 15 دقيقة.
-- قفل الحساب تلقائياً بعد 5 محاولات فاشلة متتالية لمدة 30 دقيقة.
-- رسالة الخطأ موحَّدة: "بيانات الدخول غير صحيحة" (بدون تحديد ما إذا كان البريد أو كلمة المرور هو الخطأ).
-- تسجيل كل محاولة دخول في `login_attempts`.
-
-### حماية API
-- SQL Injection: استخدم Prisma Parameterized Queries دائماً، لا Raw Queries.
-- XSS: تنظيف المدخلات بـ `DOMPurify` في Frontend، وـ `class-sanitizer` أو `sanitize-html` في Backend.
-- CSRF: استخدم Double Submit Cookie Pattern أو SameSite=Strict للـ Cookies.
-- Input Validation: استخدم `class-validator` + `class-transformer` في NestJS لكل DTO.
-- استخدم `helmet` في NestJS لتعيين Security Headers.
-- استخدم `cors` مع whitelist صريحة للنطاقات المسموح بها.
-
-### إعداد Cookies
-```
-HttpOnly: true
-Secure: true (في بيئة الإنتاج)
-SameSite: Strict
-Path: /auth/refresh
-MaxAge: 7 days
-```
-
-### مبدأ أقل الصلاحيات
-- لا تُرسل بيانات لا يحتاجها الـ Client (مثل password_hash).
-- لا تسمح للمستخدم بتعديل دوره بنفسه.
-- لا تسمح لأي Employee بتعديل أو حذف Manager.
-- تحقق من الصلاحية الفعلية في كل Request، لا فقط من الدور.
-- استخدم OwnershipGuard للتحقق من أن المستخدم يعدّل موارده هو فقط.
-
-### المتغيرات البيئية
-- احفظ جميع الأسرار في `.env` ولا تُدمجها داخل الكود.
-- أضف `.env` إلى `.gitignore`.
-- أنشئ `.env.example` بمفاتيح فارغة كمرجع.
+| المتطلب | التفاصيل |
+|---|---|
+| كلمات المرور | bcrypt rounds=12 أو argon2id — لا تخزين كنص صريح |
+| JWT | Access Token 15 دقيقة (في الذاكرة) + Refresh Token 7 أيام (في DB كـ Hash) |
+| Cookie | HttpOnly + Secure + SameSite=Strict + Path=/auth/refresh |
+| Rate Limiting | 5 محاولات / 15 دقيقة لكل IP على مسارات Auth |
+| قفل الحساب | 30 دقيقة بعد 5 محاولات فاشلة متتالية |
+| رسالة الخطأ | "بيانات الدخول غير صحيحة" — لا يكشف سبب الفشل |
+| SQL Injection | Prisma Parameterized Queries دائماً — لا Raw SQL |
+| XSS | DOMPurify (Frontend) + sanitize-html (Backend) |
+| CSRF | Double Submit Cookie Pattern أو SameSite=Strict |
+| Input Validation | class-validator + class-transformer على كل DTO |
+| Security Headers | Helmet.js في NestJS |
+| CORS | Whitelist صريح — لا * في Production |
+| Escalation | لا مستخدم يرفع صلاحياته بنفسه — OwnershipGuard |
+| Admin Protection | لا يمكن حذف أو تعديل حساب Admin من أي حساب آخر |
+| Row Isolation | Manager يرى منشأته فقط — EstablishmentContextInterceptor |
+| Guest Isolation | GuestGuard — مسارات Guest لا تقبل Staff tokens |
+| الأسرار | جميع المفاتيح في .env — لا في الكود |
+| Audit Logs | كل عملية حساسة تُسجَّل تلقائياً بـ AuditLogInterceptor |
+| Soft Delete | جميع الجداول الرئيسية: is_deleted + deleted_at |
+| ZATCA Keys | شهادة + مفتاح ZATCA في .env فقط |
+| Tax Integrity | معدل VAT ثابت في الكود — لا يُعدَّل من واجهة المستخدم |
 
 ---
 
-## ثامناً: منطق الصلاحيات
+## ثامناً: Guards المطلوبة
 
-### شروط السماح بالوصول (بالترتيب)
-
-1. **المستخدم مسجَّل الدخول** — Access Token صالح وغير منتهي.
-2. **الحساب مُفعَّل** — `is_email_verified = true` و`is_active = true` و`is_deleted = false`.
-3. **الاشتراك ساري** — إما:
-   - في فترة التجربة المجانية (60 يوماً تتناقص يومياً)، أو
-   - يمتلك اشتراكاً نشطاً لم تنتهِ صلاحيته.
-4. **المستخدم يمتلك دوراً واحداً على الأقل**.
-5. **الدور يمتلك الصلاحية المطلوبة** — التحقق من `role_permissions`.
-6. **في حالة تعدد الأدوار**: يحصل المستخدم على مجموع صلاحيات جميع أدواره (Union).
-7. **الصلاحية المخصصة** (`user_permissions`): تُضاف فوق صلاحيات الأدوار (اختيارية).
-
-### قواعد منع تعارض الصلاحيات الحرجة
-- لا يمكن لأي مستخدم منح لنفسه صلاحية أعلى من صلاحياته الحالية.
-- لا يمكن تعديل أو حذف حساب Admin الافتراضي.
-- لا يمكن إزالة دور Admin من المستخدم الوحيد الذي يمتلكه في النظام.
-
----
-
-## تاسعاً: واجهات API المطلوبة
-
-### Authentication APIs
-
----
-
-#### `POST /auth/register`
-- **الوظيفة**: تسجيل مستخدم جديد وإرسال رمز تحقق للبريد.
-- **الصلاحية**: عامة (لا تتطلب مصادقة).
-- **المدخلات (Body)**:
-```json
-{
-  "name": "أحمد محمد",
-  "email": "ahmed@example.com",
-  "phone": "+966501234567",
-  "establishment_name": "فندق النخيل",
-  "password": "P@ssw0rd123!",
-  "password_confirm": "P@ssw0rd123!",
-  "terms_accepted": true
-}
-```
-- **المخرجات (201)**:
-```json
-{
-  "success": true,
-  "message": "تم إنشاء الحساب. يرجى التحقق من بريدك الإلكتروني.",
-  "data": { "user_id": "uuid", "email": "ahmed@example.com" }
-}
-```
-- **أخطاء محتملة**: 400 (بيانات غير صالحة)، 409 (البريد مستخدم مسبقاً).
-
----
-
-#### `POST /auth/login`
-- **الوظيفة**: تسجيل الدخول وإصدار Access Token وRefresh Token.
-- **الصلاحية**: عامة.
-- **المدخلات (Body)**:
-```json
-{
-  "email": "ahmed@example.com",
-  "password": "P@ssw0rd123!",
-  "remember_me": true
-}
-```
-- **المخرجات (200)**:
-```json
-{
-  "success": true,
-  "data": {
-    "access_token": "eyJ...",
-    "user": {
-      "id": "uuid",
-      "name": "أحمد محمد",
-      "email": "ahmed@example.com",
-      "roles": ["manager"],
-      "permissions": ["users.read", "bookings.create"]
-    }
-  }
-}
-```
-- **Refresh Token**: يُحفظ في HttpOnly Cookie تلقائياً.
-- **أخطاء محتملة**: 401 (بيانات غير صحيحة)، 403 (حساب غير مُفعَّل أو مقفل)، 429 (تجاوز حد المحاولات).
-
----
-
-#### `POST /auth/logout`
-- **الوظيفة**: تسجيل الخروج وإلغاء Refresh Token.
-- **الصلاحية**: مسجَّل الدخول.
-- **المدخلات**: Cookie (refresh_token).
-- **المخرجات (200)**:
-```json
-{ "success": true, "message": "تم تسجيل الخروج بنجاح." }
+```typescript
+JwtAuthGuard        // التحقق من Access Token
+RolesGuard          // التحقق من الدور (ADMIN / MANAGER / EMPLOYEE)
+PermissionsGuard    // التحقق من الصلاحية الفعلية
+SubscriptionGuard   // التحقق من سريان الاشتراك أو التجربة
+OwnershipGuard      // لا يعدّل المستخدم إلا ما يخصّه
+GuestGuard          // مسارات الضيف — token.type === 'guest'
+EstablishmentContextInterceptor  // يضبط establishment_id تلقائياً لكل request
 ```
 
 ---
 
-#### `POST /auth/refresh-token`
-- **الوظيفة**: تجديد Access Token باستخدام Refresh Token.
-- **الصلاحية**: Refresh Token صالح في الـ Cookie.
-- **المخرجات (200)**:
-```json
-{
-  "success": true,
-  "data": { "access_token": "eyJ..." }
-}
-```
-- **أخطاء محتملة**: 401 (Token منتهٍ أو ملغى).
+## تاسعاً: واجهات API الكاملة
 
----
+### المصادقة
 
-#### `POST /auth/forgot-password`
-- **الوظيفة**: إرسال رابط إعادة تعيين كلمة المرور.
-- **الصلاحية**: عامة.
-- **المدخلات (Body)**:
-```json
-{ "email": "ahmed@example.com" }
-```
-- **المخرجات (200)**:
-```json
-{ "success": true, "message": "إذا كان البريد مسجَّلاً، ستصلك تعليمات إعادة التعيين." }
-```
-> **ملاحظة أمنية**: الرسالة موحَّدة بغض النظر عن وجود البريد في النظام.
-
----
-
-#### `POST /auth/reset-password`
-- **الوظيفة**: تعيين كلمة مرور جديدة باستخدام رمز إعادة التعيين.
-- **المدخلات (Body)**:
-```json
-{
-  "token": "reset-token-string",
-  "password": "NewP@ssw0rd!",
-  "password_confirm": "NewP@ssw0rd!"
-}
-```
-- **المخرجات (200)**:
-```json
-{ "success": true, "message": "تم تغيير كلمة المرور بنجاح. يرجى تسجيل الدخول." }
-```
-- **أخطاء محتملة**: 400 (رمز غير صالح أو منتهٍ).
-
----
-
-#### `POST /auth/verify-email`
-- **الوظيفة**: التحقق من البريد الإلكتروني باستخدام رمز OTP.
-- **المدخلات (Body)**:
-```json
-{ "user_id": "uuid", "otp": "123456" }
-```
-- **المخرجات (200)**:
-```json
-{ "success": true, "message": "تم تفعيل حسابك بنجاح." }
-```
-
----
-
-#### `GET /auth/me`
-- **الوظيفة**: جلب بيانات المستخدم الحالي مع أدواره وصلاحياته.
-- **الصلاحية**: مسجَّل الدخول.
-- **المخرجات (200)**:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "name": "أحمد محمد",
-    "email": "ahmed@example.com",
-    "roles": ["manager"],
-    "permissions": ["users.read", "bookings.create", "profile.update"],
-    "subscription": {
-      "type": "trial",
-      "days_remaining": 45
-    }
-  }
-}
-```
-
----
-
-### Users APIs
-
-| المسار | الطريقة | الصلاحية المطلوبة | الوظيفة |
+| الطريقة | المسار | الوظيفة | الصلاحية |
 |---|---|---|---|
-| `/users` | GET | `users.read` | قائمة المستخدمين مع بحث وتصفية |
-| `/users/:id` | GET | `users.read` | تفاصيل مستخدم واحد |
-| `/users` | POST | `users.create` | إنشاء مستخدم جديد |
-| `/users/:id` | PATCH | `users.update` | تعديل بيانات مستخدم |
-| `/users/:id` | DELETE | `users.delete` | حذف ناعم للمستخدم |
-| `/users/:id/activate` | PATCH | `users.update` | تفعيل الحساب |
-| `/users/:id/deactivate` | PATCH | `users.update` | تعطيل الحساب |
+| POST | /auth/register | تسجيل منشأة جديدة + بدء تجربة 60 يوم | عام |
+| POST | /auth/login | تسجيل الدخول + إصدار Tokens | عام |
+| POST | /auth/logout | تسجيل الخروج + إلغاء Refresh Token | مسجّل |
+| POST | /auth/refresh-token | تجديد Access Token | Cookie |
+| POST | /auth/forgot-password | إرسال رابط إعادة التعيين | عام |
+| POST | /auth/reset-password | تعيين كلمة مرور جديدة | Token |
+| POST | /auth/verify-email | تفعيل البريد بـ OTP | عام |
+| GET | /auth/me | بيانات المستخدم + أدواره + صلاحياته | مسجّل |
 
----
+### المستخدمون والمنشآت
 
-### Roles APIs
-
-| المسار | الطريقة | الصلاحية المطلوبة | الوظيفة |
+| الطريقة | المسار | الوظيفة | الصلاحية |
 |---|---|---|---|
-| `/roles` | GET | `roles.read` | قائمة الأدوار |
-| `/roles/:id` | GET | `roles.read` | تفاصيل دور واحد |
-| `/roles` | POST | `roles.create` | إنشاء دور جديد |
-| `/roles/:id` | PATCH | `roles.update` | تعديل الدور |
-| `/roles/:id` | DELETE | `roles.delete` | حذف الدور (غير النظامي) |
+| GET | /users | قائمة المستخدمين مع بحث وتصفية | users.read |
+| POST | /users | إنشاء موظف جديد | users.create |
+| PATCH | /users/:id | تعديل بيانات مستخدم | users.update |
+| DELETE | /users/:id | حذف ناعم Soft Delete | users.delete |
+| PATCH | /users/:id/activate | تفعيل الحساب | users.update |
+| POST | /users/:id/assign-role | تعيين دور لمستخدم | permissions.assign |
+| GET | /establishments | كل المنشآت — Admin فقط | Admin |
+| POST | /subscriptions/renew | تجديد الاشتراك برقم المنشأة | settings.update |
 
----
+### الإعدادات والضرائب
 
-### Permissions APIs
-
-| المسار | الطريقة | الصلاحية المطلوبة | الوظيفة |
+| الطريقة | المسار | الوظيفة | الصلاحية |
 |---|---|---|---|
-| `/permissions` | GET | `permissions.assign` | قائمة الصلاحيات مصنَّفة |
-| `/roles/:id/permissions` | POST | `permissions.assign` | ربط صلاحيات بدور |
-| `/roles/:id/permissions/:permId` | DELETE | `permissions.assign` | إزالة صلاحية من دور |
+| GET | /settings/tax | عرض إعدادات الضرائب | tax_settings.view |
+| PATCH | /settings/tax | تحديث رسوم السياحة (تفعيل/تعطيل/معدل) | tax_settings.update |
+| GET | /bookings/:id/tax-breakdown | تفصيل الضرائب لحجز محدد | bookings.read |
+| GET | /reports/tax | تقرير الضرائب المحصّلة (VAT + سياحة) | reports.view |
 
----
+### الأدوار والصلاحيات
 
-### Audit Logs APIs
-
-| المسار | الطريقة | الصلاحية المطلوبة | الوظيفة |
+| الطريقة | المسار | الوظيفة | الصلاحية |
 |---|---|---|---|
-| `/audit-logs` | GET | `audit_logs.view` | قائمة سجلات التدقيق مع تصفية |
-| `/audit-logs/:id` | GET | `audit_logs.view` | تفاصيل سجل واحد |
+| GET | /roles | قائمة الأدوار | roles.read |
+| POST | /roles | إنشاء دور جديد | roles.create |
+| PATCH | /roles/:id | تعديل الدور | roles.update |
+| DELETE | /roles/:id | حذف دور غير نظامي | roles.delete |
+| GET | /permissions | قائمة الصلاحيات | permissions.read |
+| POST | /roles/:id/permissions | ربط صلاحيات بدور | permissions.assign |
+| DELETE | /roles/:id/permissions/:pid | إزالة صلاحية من دور | permissions.assign |
+
+### PMS — الغرف والضيوف والحجوزات
+
+| الطريقة | المسار | الوظيفة | الصلاحية |
+|---|---|---|---|
+| GET | /rooms/availability | فحص التوفر ?checkIn&checkOut | rooms.read |
+| POST | /rooms | إضافة غرفة جديدة | rooms.create |
+| PATCH | /rooms/:id/status | تغيير حالة الغرفة | rooms.change_status |
+| GET | /guests | قائمة الضيوف | guests.read |
+| POST | /guests | تسجيل ضيف جديد | guests.create |
+| GET | /guests/:id/history | سجل إقامات ضيف | guests.read |
+| PATCH | /guests/:id/blacklist | إضافة لقائمة الحظر | guests.blacklist |
+| GET | /bookings | قائمة الحجوزات | bookings.read |
+| POST | /bookings | إنشاء حجز جديد (مع حساب الضرائب) | bookings.create |
+| POST | /bookings/:id/check-in | تسجيل الدخول الفعلي | bookings.check_in |
+| POST | /bookings/:id/check-out | تسجيل الخروج + فاتورة ZATCA | bookings.check_out |
+| POST | /bookings/:id/review | تسجيل تقييم بعد الخروج | bookings.update |
+
+### Night Audit + ZATCA + Housekeeping
+
+| الطريقة | المسار | الوظيفة | الصلاحية |
+|---|---|---|---|
+| GET | /night-audit/settings | عرض إعدادات Night Audit | night_audit.view |
+| PATCH | /night-audit/settings | تعديل الإعدادات — Manager فقط | night_audit.settings |
+| POST | /night-audit/run | تشغيل Night Audit يدوياً | night_audit.run |
+| GET | /night-audit/:date/report | تقرير يوم محدد PDF | night_audit.view |
+| POST | /zatca/invoices/:id/generate | إصدار فاتورة ZATCA (VAT + سياحة) | invoices.create |
+| GET | /zatca/invoices/:id/qr | صورة QR للفاتورة | invoices.view |
+| POST | /zatca/verify-qr | التحقق من QR — عام بدون JWT | عام |
+| GET | /housekeeping | لوحة مهام التدبير | housekeeping.view |
+| POST | /housekeeping | إنشاء مهمة تدبير | housekeeping.create |
+
+### تطبيق الحجز المباشر (مع الضرائب)
+
+| الطريقة | المسار | الوظيفة | الصلاحية |
+|---|---|---|---|
+| GET | /book/:slug | صفحة المنشأة العامة | عام — بدون JWT |
+| GET | /book/:slug/search | البحث + عرض السعر الكامل (صافي + ضرائب) | عام |
+| POST | /book/:slug/check-promo | التحقق من كود خصم | عام |
+| POST | /book/:slug/price-preview | معاينة السعر التفصيلي مع جميع الضرائب | عام |
+| POST | /book/:slug/create | إنشاء حجز مباشر (يُحسب الضرائب من DB) | عام |
+| POST | /book/:slug/payment | بدء عملية الدفع Moyasar | عام |
+| GET | /book/my-booking | تتبع الحجز برقم الهاتف | عام |
+| POST | /book/my-booking/cancel | إلغاء الحجز | عام |
+| PATCH | /booking-app/settings | إعدادات تطبيق الحجز | booking_app.settings |
+| POST | /booking-app/promotions | إنشاء كود خصم | booking_app.promotions |
+| GET | /booking-app/savings-report | تقرير الوفر من العمولات | booking_app.view |
+
+### التقارير و KPI
+
+| الطريقة | المسار | الوظيفة | الصلاحية |
+|---|---|---|---|
+| GET | /reports/kpis | مؤشرات KPI الحية (+ إجمالي الضرائب) | dashboard.analytics |
+| GET | /reports/occupancy | تقرير الإشغال يومي/شهري | reports.view |
+| GET | /reports/revenue | تقرير الإيرادات بالمصدر | reports.view |
+| GET | /reports/tax | تقرير VAT + رسوم السياحة | reports.view |
+| GET | /reports/guests | تقرير الضيوف بالدول والمناطق | reports.view |
+| GET | /reports/reviews | تقرير التقييمات | reports.view |
+| GET | /reports/forecast | توقعات الإشغال ?days=7/14/30 | reports.view |
+| GET | /reports/savings | الوفر من العمولات vs OTA | reports.view |
+| GET | /audit-logs | سجل التدقيق | audit_logs.view |
 
 ---
 
-## عاشراً: هيكل المشروع
+## عاشراً: الدول والمناطق
+
+مكوّن مشترك `CountryRegionSelect.tsx` يُستخدم في:
+- نموذج تسجيل المنشأة
+- نموذج إنشاء حجز مباشر
+- ملف الضيف
+- إعدادات المنشأة
+- تقرير الضيوف (Shamoos)
+
+**السلوك:**
+- عند اختيار المملكة العربية السعودية: قائمة منسدلة بالمناطق الـ 13
+- عند اختيار دولة أخرى: حقل نصي حر
+- المناطق السعودية الـ 13: الرياض / مكة المكرمة / المدينة المنورة / القصيم / المنطقة الشرقية / عسير / تبوك / حائل / الحدود الشمالية / جازان / نجران / الباحة / الجوف
+- مخزنة ثابتة في `src/common/data/locations.ts` — لا DB
+
+---
+
+## حادي عشر: نظام الاشتراكات
+
+- **فترة تجربة مجانية:** 60 يوماً تبدأ تلقائياً عند التسجيل
+- **رقم تسلسلي:** يُولَّد تلقائياً (1، 2، 3...) لكل منشأة
+- **التجديد:** برقم المنشأة التسلسلي فقط — Admin يجدّد
+- **حالات الاشتراك:** TRIAL / ACTIVE / EXPIRED / SUSPENDED
+- `SubscriptionGuard` يمنع الوصول عند انتهاء الاشتراك
+- تحذيرات تلقائية قبل 7 أيام و3 أيام من الانتهاء
+
+---
+
+## ثاني عشر: هيكل المشروع
 
 ```
 duyuf-platform/
 ├── apps/
-│   ├── backend/                    # NestJS Application
-│   │   ├── src/
-│   │   │   ├── auth/
-│   │   │   │   ├── auth.module.ts
-│   │   │   │   ├── auth.controller.ts
-│   │   │   │   ├── auth.service.ts
-│   │   │   │   ├── strategies/
-│   │   │   │   │   ├── jwt.strategy.ts
-│   │   │   │   │   └── jwt-refresh.strategy.ts
-│   │   │   │   └── dto/
-│   │   │   │       ├── register.dto.ts
-│   │   │   │       ├── login.dto.ts
-│   │   │   │       ├── forgot-password.dto.ts
-│   │   │   │       └── reset-password.dto.ts
-│   │   │   ├── users/
-│   │   │   │   ├── users.module.ts
-│   │   │   │   ├── users.controller.ts
-│   │   │   │   ├── users.service.ts
-│   │   │   │   └── dto/
-│   │   │   ├── roles/
-│   │   │   │   ├── roles.module.ts
-│   │   │   │   ├── roles.controller.ts
-│   │   │   │   └── roles.service.ts
-│   │   │   ├── permissions/
-│   │   │   │   ├── permissions.module.ts
-│   │   │   │   ├── permissions.controller.ts
-│   │   │   │   └── permissions.service.ts
-│   │   │   ├── audit-logs/
-│   │   │   │   ├── audit-logs.module.ts
-│   │   │   │   ├── audit-logs.controller.ts
-│   │   │   │   └── audit-logs.service.ts
-│   │   │   ├── common/
-│   │   │   │   ├── guards/
-│   │   │   │   │   ├── jwt-auth.guard.ts
-│   │   │   │   │   ├── roles.guard.ts
-│   │   │   │   │   ├── permissions.guard.ts
-│   │   │   │   │   └── ownership.guard.ts
-│   │   │   │   ├── decorators/
-│   │   │   │   │   ├── roles.decorator.ts
-│   │   │   │   │   ├── permissions.decorator.ts
-│   │   │   │   │   └── current-user.decorator.ts
-│   │   │   │   ├── filters/
-│   │   │   │   │   └── http-exception.filter.ts
-│   │   │   │   ├── interceptors/
-│   │   │   │   │   └── audit-log.interceptor.ts
-│   │   │   │   └── pipes/
-│   │   │   │       └── validation.pipe.ts
-│   │   │   ├── mail/
-│   │   │   │   ├── mail.module.ts
-│   │   │   │   └── mail.service.ts
-│   │   │   ├── prisma/
-│   │   │   │   ├── prisma.module.ts
-│   │   │   │   └── prisma.service.ts
-│   │   │   └── main.ts
-│   │   ├── prisma/
-│   │   │   ├── schema.prisma
-│   │   │   └── seed.ts
-│   │   ├── test/
-│   │   │   ├── auth.e2e-spec.ts
-│   │   │   ├── users.e2e-spec.ts
-│   │   │   └── roles.e2e-spec.ts
-│   │   └── .env.example
+│   ├── backend/  (NestJS)
+│   │   └── src/
+│   │       ├── auth/           -- المصادقة + strategies + DTOs
+│   │       ├── users/          -- إدارة المستخدمين
+│   │       ├── establishments/ -- المنشآت
+│   │       ├── subscriptions/  -- الاشتراكات
+│   │       ├── roles/          -- الأدوار
+│   │       ├── permissions/    -- الصلاحيات
+│   │       ├── tax-settings/   -- إعدادات الضرائب (جديد)
+│   │       ├── rooms/          -- الغرف
+│   │       ├── room-types/     -- أنواع الغرف
+│   │       ├── guests/         -- ملفات الضيوف
+│   │       ├── bookings/       -- الحجوزات (Staff)
+│   │       ├── booking-app/    -- تطبيق الحجز المباشر
+│   │       ├── night-audit/    -- Night Audit
+│   │       ├── zatca/          -- ZATCA + QR
+│   │       ├── housekeeping/   -- التدبير المنزلي
+│   │       ├── reports/        -- التقارير و KPI
+│   │       ├── audit-logs/     -- سجل التدقيق
+│   │       ├── common/
+│   │       │   ├── guards/     -- JwtAuth|Roles|Permissions|Subscription|Ownership|Guest
+│   │       │   ├── interceptors/ -- AuditLog + EstablishmentContext
+│   │       │   ├── services/   -- TaxCalculator (Service مشترك للضرائب)
+│   │       │   └── data/       -- locations.ts (ثابت — لا DB)
+│   │       ├── mail/ + sms/
+│   │       └── prisma/
+│   │           ├── schema.prisma
+│   │           └── seed.ts
 │   │
-│   └── frontend/                   # Next.js 14 Application
-│       ├── app/
-│       │   ├── (auth)/
-│       │   │   ├── login/
-│       │   │   │   └── page.tsx
-│       │   │   ├── register/
-│       │   │   │   └── page.tsx
-│       │   │   ├── verify-email/
-│       │   │   │   └── page.tsx
-│       │   │   ├── forgot-password/
-│       │   │   │   └── page.tsx
-│       │   │   └── reset-password/
-│       │   │       └── page.tsx
-│       │   ├── (dashboard)/
-│       │   │   ├── layout.tsx
-│       │   │   ├── page.tsx
-│       │   │   ├── users/
-│       │   │   │   └── page.tsx
-│       │   │   ├── roles/
-│       │   │   │   └── page.tsx
-│       │   │   ├── permissions/
-│       │   │   │   └── page.tsx
-│       │   │   ├── audit-logs/
-│       │   │   │   └── page.tsx
-│       │   │   └── profile/
-│       │   │       └── page.tsx
-│       │   ├── 401/
-│       │   │   └── page.tsx
-│       │   ├── 403/
-│       │   │   └── page.tsx
-│       │   └── layout.tsx
-│       ├── components/
-│       │   ├── auth/
-│       │   ├── users/
-│       │   ├── roles/
-│       │   └── ui/
-│       ├── lib/
-│       │   ├── api.ts
-│       │   ├── auth.ts
-│       │   └── permissions.ts
-│       ├── store/
-│       │   └── auth.store.ts
-│       ├── middleware.ts
-│       ├── messages/
-│       │   ├── ar.json
-│       │   └── en.json
-│       └── .env.example
-│
-├── docker-compose.yml
-└── README.md
+│   └── frontend/ (Next.js 14)
+│       └── app/
+│           ├── (auth)/         -- login|register|verify|forgot|reset
+│           ├── (dashboard)/
+│           │   ├── bookings/   -- + check-in + check-out + review
+│           │   ├── settings/
+│           │   │   └── tax/    -- إعدادات الضرائب (جديد)
+│           │   ├── night-audit/
+│           │   ├── zatca/scanner
+│           │   ├── reports/    -- + تقرير الضرائب
+│           │   └── booking-app/
+│           ├── book/[slug]/    -- صفحات الحجز العامة (Public)
+│           └── guest/          -- ملف الضيف (OTP)
+```
+
+### `TaxCalculatorService` (خدمة مشتركة)
+
+```typescript
+// src/common/services/tax-calculator.service.ts
+@Injectable()
+export class TaxCalculatorService {
+  calculate(params: {
+    base_price: number;
+    discount_pct: number;
+    tourism_tax_enabled: boolean;
+    tourism_tax_rate: number;   // 0.025 افتراضي
+    vat_rate: number;            // 0.15 ثابت
+  }): TaxBreakdown {
+    const price_net = base_price * (1 - discount_pct / 100);
+    const tourism_tax_amount = tourism_tax_enabled
+      ? price_net * tourism_tax_rate
+      : 0;
+    const vat_base = price_net + tourism_tax_amount;
+    const vat_amount = vat_base * vat_rate;
+    return {
+      base_price,
+      discount_amount: base_price - price_net,
+      price_net,
+      tourism_tax_amount,
+      vat_amount,
+      total_amount: vat_base + vat_amount,
+    };
+  }
+}
 ```
 
 ---
 
-## حادي عشر: ملف Environment Variables النموذجي
+## ثالث عشر: متغيرات البيئة (.env.example)
 
-### `apps/backend/.env.example`
 ```env
 # === Application ===
 NODE_ENV=development
@@ -799,257 +767,125 @@ APP_URL=http://localhost:3001
 FRONTEND_URL=http://localhost:3000
 
 # === Database ===
-DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/duyuf_db
+DATABASE_URL=postgresql://USER:PASS@localhost:5432/duyuf_db
 
 # === JWT ===
-JWT_ACCESS_SECRET=REPLACE_WITH_STRONG_SECRET_MIN_64_CHARS
+JWT_ACCESS_SECRET=REPLACE_MIN_64_CHARS
 JWT_ACCESS_EXPIRES_IN=15m
-JWT_REFRESH_SECRET=REPLACE_WITH_DIFFERENT_STRONG_SECRET_MIN_64_CHARS
+JWT_REFRESH_SECRET=REPLACE_DIFFERENT_MIN_64_CHARS
 JWT_REFRESH_EXPIRES_IN=7d
 
-# === Bcrypt ===
+# === Security ===
 BCRYPT_SALT_ROUNDS=12
-
-# === Email ===
-MAIL_HOST=smtp.example.com
-MAIL_PORT=587
-MAIL_SECURE=false
-MAIL_USER=noreply@duyuf.com
-MAIL_PASSWORD=REPLACE_WITH_MAIL_PASSWORD
-MAIL_FROM="منصة ضيوف <noreply@duyuf.com>"
-
-# === Rate Limiting ===
 THROTTLE_TTL=900
 THROTTLE_LIMIT=5
-
-# === Token Expiry ===
-EMAIL_VERIFY_OTP_EXPIRES_MINUTES=15
-PASSWORD_RESET_EXPIRES_MINUTES=30
+ACCOUNT_LOCK_MINUTES=30
 TRIAL_DAYS=60
-```
+ADMIN_DEFAULT_PASSWORD=REPLACE_STRONG_PASS
 
-### `apps/frontend/.env.example`
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3001
-NEXT_PUBLIC_APP_NAME=منصة ضيوف
-NEXT_PUBLIC_DEFAULT_LOCALE=ar
-```
+# === Email (Zoho Mail) ===
+MAIL_HOST=smtp.zoho.sa
+MAIL_PORT=587
+MAIL_USER=info@dheuof.com
+MAIL_PASSWORD=REPLACE
+MAIL_FROM="منصة ضيوف <info@dheuof.com>"
 
----
+# === SMS ===
+SMS_PROVIDER=unifonic
+SMS_API_KEY=REPLACE
 
-## ثاني عشر: آلية تشغيل المشروع محلياً
+# === Payment ===
+PAYMENT_GATEWAY=moyasar
+MOYASAR_API_KEY=REPLACE
+MOYASAR_WEBHOOK_SECRET=REPLACE
 
-```bash
-# 1. استنساخ المشروع
-git clone https://github.com/your-org/duyuf-platform.git
-cd duyuf-platform
+# === ZATCA ===
+ZATCA_ENV=sandbox
+ZATCA_VAT_NUMBER=REPLACE
+ZATCA_CERTIFICATE=REPLACE
+ZATCA_PRIVATE_KEY=REPLACE
 
-# 2. تشغيل قاعدة البيانات عبر Docker
-docker-compose up -d postgres
-
-# 3. إعداد Backend
-cd apps/backend
-cp .env.example .env
-# عدّل .env بالقيم الصحيحة
-npm install
-npx prisma migrate dev --name init
-npx prisma db seed
-npm run start:dev
-
-# 4. إعداد Frontend (في نافذة طرفية جديدة)
-cd apps/frontend
-cp .env.example .env
-npm install
-npm run dev
-
-# 5. الوصول إلى التطبيق
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:3001
-# Swagger Docs: http://localhost:3001/api/docs
-```
-
-### `docker-compose.yml`
-```yaml
-version: '3.8'
-services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: duyuf_db
-      POSTGRES_USER: duyuf_user
-      POSTGRES_PASSWORD: duyuf_pass
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-volumes:
-  postgres_data:
+# === Tax (System Defaults — المعدل الثابت في الكود فقط) ===
+VAT_RATE=0.15
+DEFAULT_TOURISM_TAX_RATE=0.025
 ```
 
 ---
 
-## ثالث عشر: بيانات Seed الافتراضية
+## رابع عشر: ترتيب التنفيذ المقترح
 
-```typescript
-// prisma/seed.ts — ملخص البيانات الأساسية
-
-// الأدوار الأساسية (is_system = true)
-const roles = ['admin', 'manager', 'employee', 'user'];
-
-// الصلاحيات الأساسية
-const permissions = [
-  // Users
-  { name: 'users.create', module: 'users' },
-  { name: 'users.read',   module: 'users' },
-  { name: 'users.update', module: 'users' },
-  { name: 'users.delete', module: 'users' },
-  // Roles
-  { name: 'roles.create', module: 'roles' },
-  { name: 'roles.read',   module: 'roles' },
-  { name: 'roles.update', module: 'roles' },
-  { name: 'roles.delete', module: 'roles' },
-  // Permissions
-  { name: 'permissions.assign', module: 'permissions' },
-  // Dashboard & Reports
-  { name: 'dashboard.view',  module: 'dashboard' },
-  { name: 'reports.view',    module: 'reports' },
-  { name: 'reports.export',  module: 'reports' },
-  // Settings & Profile
-  { name: 'settings.update', module: 'settings' },
-  { name: 'profile.view',    module: 'profile' },
-  { name: 'profile.update',  module: 'profile' },
-  // Audit
-  { name: 'audit_logs.view', module: 'audit' },
-  // Bookings
-  { name: 'bookings.create', module: 'bookings' },
-  { name: 'bookings.read',   module: 'bookings' },
-  { name: 'bookings.update', module: 'bookings' },
-  { name: 'bookings.delete', module: 'bookings' },
-  // Establishments
-  { name: 'establishments.create', module: 'establishments' },
-  { name: 'establishments.read',   module: 'establishments' },
-  { name: 'establishments.update', module: 'establishments' },
-  { name: 'establishments.delete', module: 'establishments' },
-];
-
-// مستخدم Admin افتراضي
-// البريد: admin@duyuf.com
-// كلمة المرور: تُعيَّن من متغير بيئي ADMIN_DEFAULT_PASSWORD
-// يجب تغييرها فور أول تسجيل دخول
-```
+| الخطوة | المرحلة | المحتوى |
+|---|---|---|
+| 1 | البنية الأساسية | NestJS + Next.js + Prisma + Docker + Auth + Guards |
+| 2 | نظام المصادقة | Register + Login + OTP + JWT + Refresh Token + Rate Limiting |
+| 3 | الأدوار والصلاحيات | Seed الأدوار والصلاحيات + RBAC Guards + لوحة الإدارة |
+| 4 | الاشتراكات | Serial Number تلقائي + Trial 60 يوم + Subscription Guard |
+| 5 | بيانات الدول والمناطق | locations.ts + CountryRegionSelect |
+| 6 | **نظام الضرائب** | TaxCalculatorService + tax_settings Table + API + واجهة Manager |
+| 7 | الغرف والضيوف | RoomTypes + Rooms + Guests + Room Map |
+| 8 | الحجوزات (Staff) | Bookings + Check-in + Check-out + Review + حساب الضرائب |
+| 9 | Night Audit | Settings + PaymentDevices + Cron ديناميكي + تقرير PDF (+ الضرائب) |
+| 10 | ZATCA | TLV Builder + QR Generator + QR Scanner + ZATCA API (+ رسوم السياحة) |
+| 11 | تطبيق الحجز المباشر | Public Pages + Pricing Engine (+ الضرائب) + Promotions + Payment |
+| 12 | التقارير و KPI | Dashboard KPIs + تقرير الضرائب + 6 تقارير + تصدير PDF/Excel |
+| 13 | Housekeeping | Kanban + Auto-create on Checkout |
+| 14 | Channel Manager | مزامنة OTA + Webhook |
+| 15 | Shamoos + Revenue Management | تقرير شهري + تسعير ديناميكي |
 
 ---
 
-## رابع عشر: الاختبارات المطلوبة
+## خامس عشر: قائمة مراجعة ما قبل الإطلاق
 
-### سيناريوهات الاختبار الشاملة
+### الأمان
+- [ ] NODE_ENV=production في بيئة الإنتاج
+- [ ] HTTPS + SSL Certificate فعّال
+- [ ] تغيير كلمة مرور Admin الافتراضية فور أول تشغيل
+- [ ] CORS بالنطاقات الصحيحة فقط
+- [ ] .env لا يوجد في Git
+- [ ] Refresh Token Rotation عند كل تجديد
+- [ ] Rate Limiting فعّال على مسارات Auth
+- [ ] Swagger Docs محظور في Production
 
-```
-✅ تسجيل حساب جديد بنجاح
-✅ تسجيل حساب بمدخلات ناقصة — يجب أن يُرجع 400
-✅ تسجيل حساب ببريد مكرر — يجب أن يُرجع 409
-✅ تسجيل الدخول الصحيح وإصدار Token
-✅ تسجيل دخول بكلمة مرور خاطئة — يجب أن يُرجع 401 برسالة عامة
-✅ تسجيل دخول قبل تفعيل البريد — يجب أن يُرجع 403
-✅ قفل الحساب بعد 5 محاولات فاشلة
-✅ تجديد Access Token بـ Refresh Token صالح
-✅ رفض Refresh Token منتهٍ أو ملغى
-✅ استعادة كلمة المرور — إرسال رابط وتعيين كلمة مرور جديدة
-✅ رفض رابط إعادة التعيين بعد استخدامه مرة واحدة
-✅ منع User العادي من دخول /users — يجب أن يُرجع 403
-✅ السماح لـ Manager بعرض مستخدمي منشأته فقط
-✅ منع Manager من تعديل حساب Admin
-✅ منع Employee من حذف أي مستخدم
-✅ التحقق من أن صلاحية users.delete مطلوبة لحذف مستخدم
-✅ اختبار Audit Log: تسجيل عملية تغيير كلمة المرور
-✅ اختبار انتهاء صلاحية Trial بعد 60 يوماً
-✅ منع الوصول لمستخدم انتهت تجربته المجانية
-```
+### الضرائب (جديد)
+- [ ] التحقق من أن VAT_RATE=0.15 ثابت لا يمكن تغييره من الواجهة
+- [ ] اختبار حساب الضرائب: حجز بدون سياحة / بسياحة / بخصم + سياحة
+- [ ] التحقق من عرض الضرائب بشكل صحيح في صفحة الحجز المباشر
+- [ ] التحقق من أن فاتورة ZATCA تشمل رسوم السياحة كسطر منفصل
+- [ ] اختبار تقرير الضرائب لفترة مخصصة
+- [ ] اختبار Night Audit: إجمالي رسوم السياحة محسوب بشكل صحيح
 
----
+### قاعدة البيانات
+- [ ] Prisma Migrations نُفّذت بنجاح في Production
+- [ ] Seed Data: أدوار + صلاحيات + Admin + tax_settings افتراضية
+- [ ] Database Connection Pooling (PgBouncer)
+- [ ] Backup تلقائي يومي
 
-## خامس عشر: ملاحظات أمنية قبل النشر
-
-```
-⚠️  تأكد من أن NODE_ENV=production في بيئة الإنتاج.
-⚠️  غيّر كلمة مرور Admin الافتراضية فور أول تشغيل.
-⚠️  تأكد من تفعيل HTTPS وSSL Certificate قبل النشر.
-⚠️  تحقق من إعداد CORS بقائمة نطاقات صريحة (لا تستخدم * في الإنتاج).
-⚠️  راجع إعدادات Helmet Security Headers.
-⚠️  تأكد من تشغيل Prisma Migrations في بيئة الإنتاج بشكل آمن.
-⚠️  لا تُدرج ملفات .env أو أي أسرار في مستودع Git.
-⚠️  فعّل تسجيل Audit Logs في الإنتاج ووجّهها إلى خدمة مراقبة.
-⚠️  راجع Refresh Token Rotation: أُلغِ القديم وأنشئ الجديد في كل تجديد.
-⚠️  تأكد من تفعيل Rate Limiting على جميع مسارات Auth.
-⚠️  استخدم Database Connection Pooling (PgBouncer) في الإنتاج.
-⚠️  احذف Swagger Docs أو قيّد وصوله في بيئة الإنتاج.
-⚠️  فعّل Monitoring وError Tracking (مثل Sentry).
-```
+### الوظائف
+- [ ] اختبار Night Audit في Staging أولاً
+- [ ] اختبار ZATCA في Sandbox قبل Production
+- [ ] اختبار بوابة الدفع Moyasar
+- [ ] اختبار إرسال SMS + البريد الإلكتروني
+- [ ] اختبار QR Scanner على Android + iOS
+- [ ] اختبار جميع سيناريوهات الصلاحيات
 
 ---
 
-## سادس عشر: قائمة مراجعة Checklist قبل الإطلاق
-
-```
-□ تم اختبار جميع مسارات API في بيئة Staging.
-□ تم التحقق من صحة جميع Validations.
-□ تم تشغيل جميع الاختبارات الآلية وهي تمر بنجاح.
-□ تم تغيير كلمة مرور Admin الافتراضية.
-□ تم تعيين قيم .env الصحيحة في بيئة الإنتاج.
-□ تم تفعيل HTTPS.
-□ تم إعداد CORS بالنطاقات الصحيحة فقط.
-□ تم التحقق من Security Headers (باستخدام securityheaders.com).
-□ تم اختبار Rate Limiting.
-□ تم التحقق من أن Refresh Tokens تُلغى عند تسجيل الخروج.
-□ تم اختبار Soft Delete واسترجاع البيانات.
-□ تم التحقق من Audit Logs تُسجَّل بشكل صحيح.
-□ تم اختبار فترة التجربة المجانية (60 يوماً).
-□ تم اختبار واجهة RTL و LTR.
-□ تم اختبار الواجهة على الجوال.
-□ تم مراجعة الأذونات: لا يوجد مسار غير محمي.
-□ تم توثيق جميع الـ API endpoints في Swagger.
-□ تم إعداد Backup تلقائي لقاعدة البيانات.
-□ تم ضبط Logging وError Monitoring.
-□ تم مراجعة Dependencies للتحقق من عدم وجود ثغرات (npm audit).
-```
-
----
-
-## سابع عشر: تحسينات مستقبلية مقترحة
-
-```
-🔮 تسجيل الدخول الاجتماعي: Google OAuth / Apple Sign-In.
-🔮 المصادقة الثنائية (2FA) عبر TOTP (Google Authenticator).
-🔮 نظام الاشتراكات والفوترة: Stripe / HyperPay.
-🔮 Multi-Tenancy الكامل: عزل بيانات كل منشأة في Schema منفصل.
-🔮 نظام الإشعارات: WebSocket / Push Notifications.
-🔮 تصدير سجلات Audit Logs بصيغة CSV/PDF.
-🔮 لوحة تحليلات ومؤشرات KPI لكل منشأة.
-🔮 نظام API Keys للتكامل مع أنظمة خارجية.
-🔮 دعم Passwordless Login (Magic Links).
-🔮 تشفير البيانات الحساسة في قاعدة البيانات (Encryption at Rest).
-```
-
----
-
-## ثامن عشر: بروتوكول التحقق الداخلي
-
-قبل إخراج النسخة النهائية، تحقق من جميع النقاط التالية:
+## سادس عشر: بروتوكول التحقق الداخلي
 
 | السؤال | الإجابة |
 |---|---|
+| هل VAT ثابت 15% ولا يمكن تغييره؟ | ✅ ثابت في الكود + TaxCalculatorService |
+| هل رسوم السياحة اختيارية لكل منشأة؟ | ✅ Manager يفعّلها/يعطّلها من الإعدادات |
+| هل الضرائب محسوبة بشكل صحيح في ZATCA؟ | ✅ رسوم السياحة سطر منفصل في XML |
 | هل نظام تسجيل الدخول آمن؟ | ✅ bcrypt + Rate Limiting + قفل الحساب |
-| هل الأدوار منفصلة عن الصلاحيات؟ | ✅ جداول منفصلة وقابلة للإدارة |
-| هل يمكن تعديل الصلاحيات دون تعديل الكود؟ | ✅ من لوحة التحكم مباشرة |
-| هل تم منع التصعيد غير المشروع؟ | ✅ لا يمكن لأي مستخدم رفع صلاحياته بنفسه |
-| هل تم حماية المسارات الحساسة؟ | ✅ AuthGuard + PermissionsGuard على كل مسار |
-| هل تم تسجيل العمليات الحساسة؟ | ✅ AuditLog Interceptor تلقائي |
-| هل يوجد تحقق من المدخلات؟ | ✅ class-validator على كل DTO |
-| هل تم استخدام تشفير مناسب؟ | ✅ bcrypt (rounds=12) أو argon2id |
-| هل الكود قابل للصيانة؟ | ✅ طبقات واضحة + هيكل منظم |
-| هل يمكن تشغيل النظام فعلياً؟ | ✅ Docker Compose + Seed + تعليمات واضحة |
+| هل الأدوار منفصلة عن الصلاحيات؟ | ✅ جداول منفصلة + DB-driven |
+| هل تم منع التصعيد غير المشروع؟ | ✅ OwnershipGuard + EstablishmentContext |
+| هل Admin يرى جميع البيانات؟ | ✅ لوحة Admin: إجمالي كل المنشآت |
+| هل الموظفون يُنشأون من Manager فقط؟ | ✅ مقيّد بـ EstablishmentContextInterceptor |
+| هل تطبيق الحجز يعرض الضرائب بوضوح؟ | ✅ تفصيل كامل: صافي + سياحة + VAT + إجمالي |
+| هل Night Audit يحسب الضرائب؟ | ✅ تقرير يشمل VAT + رسوم السياحة |
+| هل الكود قابل للصيانة والتوسع؟ | ✅ طبقات واضحة + TaxCalculatorService مشترك |
 
 ---
 
-**أخرج النسخة النهائية المنظمة الكاملة القابلة للتنفيذ مباشرة، مع الكود الكامل لكل مكون، مصقولاً ومرتباً بالترتيب الموضح في هذا البرومبت.**
+**أخرج النسخة النهائية المنظمة الكاملة القابلة للتنفيذ مباشرة، مع الكود الكامل لكل مكون، مصقولاً ومرتباً بالترتيب الموضح في هذا البرومبت. ابدأ بـ TaxCalculatorService ثم tax_settings Migration ثم ربط الضريبة بكل وحدة.**
